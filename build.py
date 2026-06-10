@@ -103,20 +103,31 @@ def parse_date(raw_date: str, default_year_month: str = "2026-06"):
     return None
 
 
+LOGO_JSON_PATH = AGENT_DIR / "01-输入" / "汽车品牌 Logo" / "brand-logos.json"
+
+
 def load_brand_logos() -> dict:
-    """从 CMF 竞品数据库加载 251 个品牌 Logo URL 映射"""
-    if not CMF_DB_PATH.exists():
-        print("  [WARN] CMF 数据库不存在，跳过品牌 Logo")
-        return {}
-    import sqlite3
-    db = sqlite3.connect(str(CMF_DB_PATH))
-    cur = db.cursor()
-    cur.execute("SELECT name_cn, logo_url FROM competitor_brands WHERE logo_url IS NOT NULL AND logo_url != ''")
-    logos = {}
-    for name, url in cur.fetchall():
-        logos[name] = url
-    db.close()
-    return logos
+    """加载品牌 Logo URL 映射（优先读共享 JSON，降级读 CMF DB）"""
+    # 优先读共享数据资产 JSON
+    if LOGO_JSON_PATH.exists():
+        data = json.loads(LOGO_JSON_PATH.read_text(encoding="utf-8"))
+        logos = data.get("brands", {})
+        print(f"  从共享 JSON 加载 {len(logos)} 个品牌 Logo")
+        return logos
+    # 降级：直接读 CMF 数据库
+    if CMF_DB_PATH.exists():
+        import sqlite3
+        db = sqlite3.connect(str(CMF_DB_PATH))
+        cur = db.cursor()
+        cur.execute("SELECT name_cn, logo_url FROM competitor_brands WHERE logo_url IS NOT NULL AND logo_url != ''")
+        logos = {}
+        for name, url in cur.fetchall():
+            logos[name] = url
+        db.close()
+        print(f"  从 CMF DB 加载 {len(logos)} 个品牌 Logo")
+        return logos
+    print("  [WARN] 无品牌 Logo 数据源，跳过")
+    return {}
 
 
 def get_brand_logo_url(car_name: str, brand_logos: dict) -> str:
