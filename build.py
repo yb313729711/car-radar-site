@@ -24,10 +24,10 @@ if sys.platform == 'win32':
 PROJECT_DIR = Path(r"D:\YB 2026\Claude Code\☆ We-Media")
 AGENT_DIR = PROJECT_DIR / "情报收集Agent"
 CALENDAR_DIR = AGENT_DIR / "汽车事件日历"
-LOGO_DIR = AGENT_DIR / "01-输入" / "汽车品牌 Logo"
 GENERATOR_SCRIPT = AGENT_DIR / "03-基座" / "infra" / "scripts" / "generate_calendar_html.py"
-CSS_TEMPLATE = AGENT_DIR / "03-基座" / "infra" / "templates" / "calendar_styles.css"
-JS_TEMPLATE = AGENT_DIR / "03-基座" / "infra" / "templates" / "calendar_scripts.js"
+
+# 品牌Logo数据源（只读）
+CMF_DB_PATH = Path(r"D:\YB 2026\DST\0407_app_CMF_竞品数据库\backend\data\cmf.db")
 
 # 输出目录
 DIST_DIR = Path(r"D:\car-radar-site")
@@ -103,24 +103,27 @@ def parse_date(raw_date: str, default_year_month: str = "2026-06"):
     return None
 
 
-def get_brand_logo_url(car_name: str) -> str:
-    """根据车型名匹配品牌Logo"""
-    brand_map = {
-        "比亚迪": "比亚迪_BYD", "比亚迪/": "比亚迪_BYD",
-        "小鹏": "小鹏_XPeng", "蔚来": "蔚来_NIO", "蔚来/": "蔚来_NIO",
-        "理想": "理想", "零跑": "零跑_Leapmotor",
-        "极氪": "极氪_Zeekr", "吉利": "吉利_Geely", "领克": "领克",
-        "岚图": "岚图_Voyah", "智己": "智己", "奇瑞": "奇瑞_Chery",
-        "哈弗": "哈弗_Haval", "坦克": "坦克_Tank",
-        "长安": "长安_Changan", "广汽": "广汽_GAC",
-        "问界": "问界", "智界": "智界", "尚界": "尚界",
-        "腾势": "腾势", "方程豹": "方程豹",
-    }
-    for brand, logo_name in brand_map.items():
-        if brand in car_name:
-            logo_path = LOGO_DIR / f"{logo_name}.png"
-            if logo_path.exists():
-                return f"assets/logos/{logo_name}.png"
+def load_brand_logos() -> dict:
+    """从 CMF 竞品数据库加载 251 个品牌 Logo URL 映射"""
+    if not CMF_DB_PATH.exists():
+        print("  [WARN] CMF 数据库不存在，跳过品牌 Logo")
+        return {}
+    import sqlite3
+    db = sqlite3.connect(str(CMF_DB_PATH))
+    cur = db.cursor()
+    cur.execute("SELECT name_cn, logo_url FROM competitor_brands WHERE logo_url IS NOT NULL AND logo_url != ''")
+    logos = {}
+    for name, url in cur.fetchall():
+        logos[name] = url
+    db.close()
+    return logos
+
+
+def get_brand_logo_url(car_name: str, brand_logos: dict) -> str:
+    """根据车型名匹配品牌Logo CDN URL"""
+    for brand_name, logo_url in brand_logos.items():
+        if brand_name in car_name:
+            return logo_url
     return ""
 
 
@@ -184,7 +187,7 @@ SITE_CSS = """
 
 # ── 热点排行页 ───────────────────────────────────────────
 
-def build_hot_ranking(events: list) -> str:
+def build_hot_ranking(events: list, brand_logos: dict) -> str:
     today = date.today()
     upcoming = []
     for ev in events:
@@ -205,8 +208,8 @@ def build_hot_ranking(events: list) -> str:
         card_cls = "rank-card rank-s" if ev["is_s"] else "rank-card"
         countdown = f"{delta}天后" if delta < 999 else "待定"
         date_label = ev["raw_date"] if delta >= 999 else f"{ev['raw_date']}"
-        logo = get_brand_logo_url(ev["car_name"])
-        logo_html = f'<img class="rank-logo" src="{logo}" alt="" />' if logo else ""
+        logo = get_brand_logo_url(ev["car_name"], brand_logos)
+        logo_html = f'<img class="rank-logo" src="{logo}" alt="" referrerpolicy="no-referrer" />' if logo else ""
 
         cards_html += f"""
         <div class="{card_cls}">
@@ -251,6 +254,7 @@ def build_hot_ranking(events: list) -> str:
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>热点排行 - {SITE_NAME}</title>
+<meta name="referrer" content="no-referrer" />
 <style>
 :root {{--bg:#0f172a;--card:#1e293b;--text:#e2e8f0;--muted:#94a3b8;--accent:#38bdf8;--s-color:#ef4444;--a-color:#f59e0b;--b-color:#10b981;--border:#334155;}}
 *{{box-sizing:border-box;margin:0;}}
@@ -323,6 +327,7 @@ def build_subscribe_page() -> str:
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>订阅日报 - {SITE_NAME}</title>
+<meta name="referrer" content="no-referrer" />
 <style>
 :root {{--bg:#0f172a;--card:#1e293b;--text:#e2e8f0;--muted:#94a3b8;--accent:#38bdf8;--border:#334155;}}
 *{{box-sizing:border-box;margin:0;}}
@@ -374,6 +379,10 @@ def build_calendar_page() -> str:
 
     html = html_path.read_text(encoding="utf-8")
 
+    # 注入 no-referrer meta（绕过汽车之家 CDN 防盗链）
+    if 'name="referrer"' not in html:
+        html = html.replace("<head>", '<head>\n<meta name="referrer" content="no-referrer" />', 1)
+
     # 注入站点 CSS
     html = html.replace("</style>", SITE_CSS + "\n</style>", 1)
 
@@ -393,43 +402,46 @@ def main():
     print("=" * 60)
 
     # Step 1: 读取数据
-    print("\n[1/5] 读取日历数据...")
+    print("\n[1/6] 读取日历数据...")
     events = load_calendar_events()
     print(f"  读取 {len(events)} 个事件")
 
-    # Step 2: 复制资源文件
-    print("\n[2/5] 复制资源文件...")
-    if ASSETS_DIR.exists():
-        shutil.rmtree(ASSETS_DIR)
-    ASSETS_DIR.mkdir(parents=True)
+    # Step 2: 加载品牌Logo
+    print("\n[2/6] 加载品牌Logo映射...")
+    brand_logos = load_brand_logos()
+    print(f"  加载 {len(brand_logos)} 个品牌Logo URL")
 
-    (ASSETS_DIR / "css").mkdir(exist_ok=True)
-    (ASSETS_DIR / "js").mkdir(exist_ok=True)
-    (ASSETS_DIR / "logos").mkdir(exist_ok=True)
+    # Step 3: 导出品牌Logo映射为共享数据资产
+    print("\n[3/6] 导出品牌Logo数据资产...")
+    logo_data_path = DIST_DIR / "assets" / "brand-logos.json"
+    logo_data_path.parent.mkdir(parents=True, exist_ok=True)
+    logo_export = {
+        "meta": {
+            "source": "汽车之家品牌API (via CMF竞品数据库)",
+            "count": len(brand_logos),
+            "fetched_at": "2026-05-19",
+            "usage": "HTML 中直接引用 URL，需设置 <meta name='referrer' content='no-referrer'>",
+        },
+        "brands": brand_logos,
+    }
+    logo_data_path.write_text(json.dumps(logo_export, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"  已导出 {logo_data_path.relative_to(DIST_DIR)}")
 
-    # 复制Logo
-    if LOGO_DIR.exists():
-        for logo in LOGO_DIR.glob("*.png"):
-            shutil.copy2(logo, ASSETS_DIR / "logos" / logo.name)
-        print(f"  复制 {len(list((ASSETS_DIR / 'logos').glob('*.png')))} 个品牌Logo")
-
-    # Step 3: 生成日历页
-    print("\n[3/5] 生成日历页...")
+    # Step 4: 生成日历页
+    print("\n[4/6] 生成日历页...")
     calendar_html = build_calendar_page()
     if calendar_html:
-        # 修正资源路径（Logo 从相对路径改为 assets/ 路径）
-        calendar_html = calendar_html.replace("汽车事件日历/", "")
         (DIST_DIR / "index.html").write_text(calendar_html, encoding="utf-8")
         print("  index.html 生成完成")
 
-    # Step 4: 生成热点排行页
-    print("\n[4/5] 生成热点排行页...")
-    hot_html = build_hot_ranking(events)
+    # Step 5: 生成热点排行页
+    print("\n[5/6] 生成热点排行页...")
+    hot_html = build_hot_ranking(events, brand_logos)
     (DIST_DIR / "hot-ranking.html").write_text(hot_html, encoding="utf-8")
     print("  hot-ranking.html 生成完成")
 
-    # Step 5: 生成订阅页
-    print("\n[5/5] 生成订阅页...")
+    # Step 6: 生成订阅页
+    print("\n[6/6] 生成订阅页...")
     sub_html = build_subscribe_page()
     (DIST_DIR / "subscribe.html").write_text(sub_html, encoding="utf-8")
     print("  subscribe.html 生成完成")
