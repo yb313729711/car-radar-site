@@ -1,0 +1,2657 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>车型事件日历看板</title>
+<style>
+:root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --s-color: #ef4444;
+    --a-color: #f59e0b;
+    --b-color: #10b981;
+    --done: #22c55e;
+    --pending: #f97316;
+    --border: #334155;
+}
+* { box-sizing: border-box; margin: 0; }
+html { scroll-behavior: smooth; scroll-padding-top: 52px; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    overflow-x: hidden;
+}
+.container { width: 100%; margin: 0 auto; padding: 16px 16px; max-width: 1400px; }
+@media (min-width: 768px) { .container { padding: 16px 24px; } }
+@media (min-width: 1200px) { .container { padding: 16px 32px; } }
+
+/* === Header === */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.header-left { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.header-left h1 { font-size: 1.4rem; font-weight: 700; }
+.header-left .date-tag {
+    font-size: 0.8rem;
+    color: var(--muted);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 10px;
+}
+.kpi-bar {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 0.78rem;
+    color: var(--muted);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px 12px;
+    flex-wrap: wrap;
+}
+.kpi-bar .kpi { display: flex; align-items: center; gap: 4px; }
+.kpi-bar .kpi-dot { width: 8px; height: 8px; border-radius: 2px; }
+.kpi-bar .kpi-num { font-weight: 700; color: var(--text); }
+
+/* === Navigation === */
+.nav-bar {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--bg);
+    padding: 8px 0 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.nav-item {
+    background: none;
+    border: none;
+    color: var(--muted);
+    padding: 6px 16px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.15s;
+    font-family: inherit;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.nav-item:hover { color: var(--text); }
+.nav-item.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* === Calendar Grid === */
+h2 { margin: 20px 0 12px; font-size: 1.1rem; border-left: 3px solid var(--accent); padding-left: 10px; }
+h3 { margin: 0 0 8px; font-size: 0.95rem; color: var(--accent); }
+.calendar-wrap { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 24px; }
+@media (min-width: 960px) { .calendar-wrap { grid-template-columns: 1fr 1fr; } }
+.month-block { background: var(--card); border-radius: 10px; padding: 10px; border: 1px solid var(--border); overflow: hidden; }
+@media (min-width: 768px) { .month-block { padding: 14px; } }
+.cal-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.cal-grid th { padding: 4px 2px; font-size: 0.7rem; color: var(--muted); border-bottom: 1px solid var(--border); }
+.cal-grid td {
+    height: 52px;
+    vertical-align: top;
+    padding: 2px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+}
+@media (min-width: 768px) {
+    .cal-grid th { padding: 6px; font-size: 0.75rem; }
+    .cal-grid td { height: 58px; padding: 3px; }
+}
+.cal-grid td.empty { background: #0b1221; }
+.cal-grid td.today { background: rgba(56, 189, 248, 0.12); box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
+.cal-grid td.has-s { background: rgba(239, 68, 68, 0.1); }
+.cal-grid td.has-event { background: rgba(245, 158, 11, 0.06); }
+.day-num { font-size: 0.72rem; font-weight: 600; margin-bottom: 1px; color: var(--muted); }
+@media (min-width: 768px) { .day-num { font-size: 0.8rem; } }
+.today .day-num { color: var(--accent); }
+.cal-event {
+    font-size: 0.55rem;
+    padding: 1px 3px;
+    border-radius: 3px;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: default;
+    line-height: 1.3;
+}
+@media (min-width: 768px) {
+    .cal-event { font-size: 0.62rem; padding: 1px 4px; }
+}
+.s-mark { background: rgba(239, 68, 68, 0.25); color: #fca5a5; }
+.a-mark { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+.b-mark { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
+.more-mark { background: rgba(148, 163, 184, 0.15); color: var(--muted); font-weight: 600; }
+
+/* === Upcoming Cards === */
+.upcoming {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 24px;
+}
+@media (min-width: 480px) { .upcoming { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); } }
+.upcoming-card {
+    display: flex;
+    gap: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    transition: border-color 0.15s;
+}
+.upcoming-card:hover { border-color: var(--accent); }
+.upcoming-card.s-card { border-left: 3px solid var(--s-color); }
+.uc-left { text-align: center; min-width: 52px; }
+.uc-date { font-size: 0.85rem; font-weight: 700; color: var(--text); }
+.uc-countdown { font-size: 0.7rem; color: var(--accent); margin-top: 2px; }
+.uc-body { flex: 1; min-width: 0; overflow: hidden; }
+.uc-title { font-size: 0.85rem; font-weight: 600; margin-bottom: 2px; word-break: break-word; }
+.uc-meta { font-size: 0.72rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.upcoming-empty { color: var(--muted); font-size: 0.85rem; padding: 16px; text-align: center; }
+
+/* === Tab Table === */
+.tab-bar {
+    display: flex;
+    gap: 0;
+    margin-bottom: 0;
+    border-bottom: 2px solid var(--border);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.tab-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.15s;
+    font-family: inherit;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+@media (min-width: 768px) { .tab-btn { padding: 8px 18px; } }
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-btn .tab-count {
+    display: inline-block;
+    background: rgba(148,163,184,0.15);
+    border-radius: 4px;
+    padding: 0 6px;
+    font-size: 0.7rem;
+    margin-left: 4px;
+}
+.tab-btn.active .tab-count { background: rgba(56,189,248,0.2); color: var(--accent); }
+
+/* Responsive table: card layout on mobile */
+.table-wrap { background: var(--card); border: 1px solid var(--border); border-top: none; border-radius: 0 0 10px 10px; }
+table.data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; table-layout: fixed; }
+table.data-table th {
+    text-align: left;
+    padding: 10px 8px;
+    background: #0f172a;
+    color: var(--muted);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    font-size: 0.8rem;
+}
+@media (min-width: 768px) { table.data-table th { padding: 10px; } }
+table.data-table td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+@media (min-width: 768px) { table.data-table td { padding: 8px 10px; } }
+table.data-table tr:hover td { background: rgba(255,255,255,0.02); }
+table.data-table tr.hidden { display: none; }
+
+.level-badge, .status-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-right: 5px;
+    white-space: nowrap;
+}
+.level-s { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+.level-a { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+.level-b { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+.status-done { background: rgba(34, 197, 94, 0.2); color: #86efac; }
+.status-pending { background: rgba(249, 115, 22, 0.2); color: #fdba74; }
+.status-normal { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+
+.pr-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    text-decoration: none;
+    margin-left: 6px;
+    vertical-align: middle;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.pr-badge:hover {
+    background: rgba(56, 189, 248, 0.25);
+    border-color: var(--accent);
+}
+
+/* Table column widths: mobile-first, flexible */
+.date-col { white-space: nowrap; width: auto; }
+.type-col { width: auto; }
+.name-col { min-width: 0; }
+.status-col { width: auto; }
+.note-col { color: var(--muted); font-size: 0.8rem; max-width: none; }
+@media (min-width: 768px) {
+    .date-col { width: 100px; }
+    .type-col { width: 80px; }
+    .name-col { min-width: 180px; }
+    .status-col { width: 90px; }
+    .note-col { max-width: 300px; }
+}
+@media (max-width: 767px) {
+    /* Mobile: hide note column to save space */
+    .note-col { display: none; }
+    table.data-table th:last-child { display: none; }
+    .name-col { word-break: break-all; }
+}
+
+/* === Preresearch Modal === */
+.pr-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.65);
+    z-index: 9999;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 16px 8px;
+    overflow-y: auto;
+}
+@media (min-width: 768px) { .pr-overlay { padding: 32px 16px; } }
+.pr-overlay.open { display: flex; }
+.pr-modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 780px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+}
+@media (min-width: 768px) { .pr-modal { max-height: calc(100vh - 64px); } }
+.pr-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0;
+    background: var(--card);
+    z-index: 2;
+    border-radius: 14px 14px 0 0;
+}
+@media (min-width: 768px) { .pr-modal-header { padding: 14px 20px; } }
+.pr-modal-title { font-size: 1rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.pr-close-btn {
+    background: none; border: none;
+    color: var(--muted); font-size: 1.5rem;
+    cursor: pointer; padding: 0 4px; line-height: 1;
+    transition: color 0.15s;
+    flex-shrink: 0;
+}
+.pr-close-btn:hover { color: var(--text); }
+.pr-modal-body { padding: 16px; }
+@media (min-width: 768px) { .pr-modal-body { padding: 20px; } }
+
+.pr-conclusion {
+    background: linear-gradient(135deg, rgba(56,189,248,0.1), rgba(56,189,248,0.02));
+    border: 1px solid rgba(56,189,248,0.25);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    font-size: 0.88rem;
+    line-height: 1.7;
+}
+@media (min-width: 768px) { .pr-conclusion { padding: 14px 18px; } }
+.pr-conclusion strong { color: var(--accent); }
+
+.pr-heat {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 16px; font-size: 0.8rem; color: var(--muted);
+}
+.pr-heat-bar {
+    flex: 1; height: 6px; border-radius: 3px;
+    background: var(--border); overflow: hidden; max-width: 200px;
+}
+.pr-heat-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.pr-heat-fill.high { background: #ef4444; }
+.pr-heat-fill.medium { background: #f59e0b; }
+.pr-heat-fill.low { background: #10b981; }
+
+.pr-metrics {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px; margin-bottom: 18px;
+}
+@media (min-width: 768px) { .pr-metrics { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); } }
+.pr-metric {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    text-align: center;
+}
+.pr-metric-num { font-size: 1.2rem; font-weight: 800; color: var(--accent); }
+.pr-metric-label { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+.pr-source-badge {
+    display: inline-block; font-size: 0.6rem; padding: 0 5px;
+    border-radius: 2px; font-weight: 600; margin-left: 3px;
+}
+.pr-source-a { background: rgba(34,197,94,0.2); color: #86efac; }
+.pr-source-b { background: rgba(56,189,248,0.2); color: #7dd3fc; }
+.pr-source-c { background: rgba(245,158,11,0.2); color: #fcd34d; }
+
+.pr-section {
+    margin-bottom: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.pr-section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; cursor: pointer; user-select: none;
+    background: rgba(255,255,255,0.02);
+    transition: background 0.15s;
+}
+.pr-section-header:hover { background: rgba(255,255,255,0.04); }
+.pr-section-title { font-size: 0.85rem; font-weight: 600; }
+.pr-section-arrow {
+    font-size: 0.7rem; color: var(--muted);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+}
+.pr-section.open .pr-section-arrow { transform: rotate(90deg); }
+.pr-section-body {
+    display: none; padding: 12px 14px;
+    font-size: 0.82rem; line-height: 1.7;
+    border-top: 1px solid var(--border);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.pr-section.open .pr-section-body { display: block; }
+
+.pr-fact { background: rgba(34,197,94,0.06); padding: 2px 0; }
+.pr-rumor { background: rgba(245,158,11,0.06); padding: 2px 0; }
+.pr-pro { border-left: 3px solid #22c55e; padding-left: 10px; margin: 4px 0; }
+.pr-con { border-left: 3px solid #ef4444; padding-left: 10px; margin: 4px 0; }
+
+.pr-direction {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    background: rgba(255,255,255,0.02);
+}
+.pr-dir-top {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+    flex-wrap: wrap;
+}
+.pr-dir-stars { color: #fbbf24; font-size: 0.85rem; letter-spacing: 1px; }
+.pr-dir-title { font-size: 0.85rem; font-weight: 600; flex: 1; min-width: 0; }
+.pr-dir-angle { font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; }
+.pr-dir-risk {
+    display: inline-block; font-size: 0.65rem; padding: 1px 6px;
+    border-radius: 3px; background: rgba(239,68,68,0.12); color: #fca5a5;
+    margin-right: 6px;
+}
+.pr-copy-btn {
+    background: none; border: 1px solid var(--border);
+    color: var(--muted); font-size: 0.65rem; padding: 2px 8px;
+    border-radius: 4px; cursor: pointer; transition: all 0.15s;
+    flex-shrink: 0;
+}
+.pr-copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+.pr-actions {
+    display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap;
+}
+.pr-action-phase {
+    flex: 1; min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.02);
+}
+@media (min-width: 768px) { .pr-action-phase { min-width: 200px; } }
+.pr-action-phase h4 {
+    font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; color: var(--accent);
+}
+.pr-action-phase ul {
+    padding-left: 16px; font-size: 0.78rem; color: var(--muted);
+}
+
+/* Modal markdown styles */
+.pr-modal-body h2 {
+    margin: 16px 0 8px;
+    font-size: 0.95rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 10px;
+    color: var(--text);
+}
+.pr-modal-body h3 {
+    margin: 12px 0 6px;
+    font-size: 0.88rem;
+    color: var(--accent);
+}
+.pr-modal-body ul, .pr-modal-body ol {
+    padding-left: 20px;
+    margin: 6px 0;
+    font-size: 0.82rem;
+}
+.pr-modal-body li { margin: 3px 0; }
+.pr-modal-body hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 12px 0;
+}
+.pr-modal-body strong { color: #e2e8f0; font-weight: 600; }
+.pr-modal-body em { color: var(--muted); }
+.pr-modal-body blockquote {
+    border-left: 3px solid var(--accent);
+    padding: 4px 12px;
+    margin: 8px 0;
+    color: var(--muted);
+    font-size: 0.82rem;
+    background: rgba(56,189,248,0.04);
+    border-radius: 0 6px 6px 0;
+}
+.pr-modal-body table {
+    width: 100%; border-collapse: collapse;
+    font-size: 0.78rem; margin: 8px 0;
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.pr-modal-body th, .pr-modal-body td {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    text-align: left;
+}
+.pr-modal-body th {
+    background: rgba(0,0,0,0.3);
+    color: var(--muted); font-weight: 600;
+}
+
+.footer { margin-top: 24px; color: var(--muted); font-size: 0.75rem; text-align: center; padding: 0 16px; }
+
+
+/* === Site Nav === */
+.site-nav {
+    display: flex; align-items: center; gap: 16px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 20px; margin-bottom: 20px;
+}
+.nav-logo {
+    font-size: 1.1rem; font-weight: 800; color: var(--accent);
+    text-decoration: none; white-space: nowrap;
+}
+.nav-links { display: flex; gap: 4px; flex: 1; }
+.nav-link {
+    padding: 4px 14px; border-radius: 6px; font-size: 0.82rem;
+    color: var(--muted); text-decoration: none; transition: all 0.15s;
+}
+.nav-link:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+.nav-link.active { color: var(--accent); background: rgba(56,189,248,0.1); }
+.nav-subscribe-btn {
+    padding: 5px 14px; border-radius: 6px; font-size: 0.78rem;
+    background: rgba(56,189,248,0.15); color: var(--accent);
+    text-decoration: none; border: 1px solid rgba(56,189,248,0.3);
+    white-space: nowrap; transition: all 0.15s;
+}
+.nav-subscribe-btn:hover { background: rgba(56,189,248,0.25); }
+@media (max-width: 600px) {
+    .site-nav { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+    .nav-links { order: 3; width: 100%; }
+}
+
+</style>
+</head>
+<body>
+<div class="container">
+<div class="site-nav">
+    <a class="nav-logo" href="index.html">汽车情报雷达</a>
+    <div class="nav-links">
+        <a class="nav-link active" href="index.html">日历</a>
+        <a class="nav-link" href="hot-ranking.html">热点</a>
+        <a class="nav-link" href="price-tracker.html">价格</a>
+    </div>
+    <a class="nav-subscribe-btn" href="subscribe.html">订阅日报</a>
+</div>
+
+    <div class="header">
+        <div class="header-left">
+            <h1>车型事件日历</h1>
+            <span class="date-tag">2026年06月10日</span>
+        </div>
+        <div class="kpi-bar">
+            <div class="kpi"><div class="kpi-dot" style="background:var(--s-color)"></div>S级 <span class="kpi-num">16</span></div>
+            <div class="kpi"><div class="kpi-dot" style="background:var(--a-color)"></div>A级 <span class="kpi-num">45</span></div>
+            <div class="kpi"><div class="kpi-dot" style="background:var(--done)"></div>已完成 <span class="kpi-num">46</span></div>
+            <div class="kpi"><div class="kpi-dot" style="background:var(--pending)"></div>待跟踪 <span class="kpi-num">28</span></div>
+        </div>
+    </div>
+
+    <div class="nav-bar">
+        <a class="nav-item active" href="#sec-calendar">日历</a>
+        <a class="nav-item" href="#sec-upcoming">近7天</a>
+        <a class="nav-item" href="#sec-events">事件总表</a>
+    </div>
+
+    <h2 id="sec-calendar">日历视图（2026年5月-2026年6月）</h2>
+    <div class="calendar-wrap">
+        <div class="month-block"><h3>2026年5月</h3>
+<table class="cal-grid"><thead><tr>
+<th>一</th>
+<th>二</th>
+<th>三</th>
+<th>四</th>
+<th>五</th>
+<th>六</th>
+<th>日</th>
+</tr></thead><tbody>
+<tr>
+<td class="empty"></td>
+<td class="empty"></td>
+<td class="empty"></td>
+<td class="empty"></td>
+<td class="">
+<div class="day-num">1</div>
+</td>
+<td class="">
+<div class="day-num">2</div>
+</td>
+<td class="">
+<div class="day-num">3</div>
+</td>
+</tr>
+<tr>
+<td class="">
+<div class="day-num">4</div>
+</td>
+<td class="">
+<div class="day-num">5</div>
+</td>
+<td class="">
+<div class="day-num">6</div>
+</td>
+<td class="">
+<div class="day-num">7</div>
+</td>
+<td class="has-event">
+<div class="day-num">8</div>
+<div class="cal-event a-mark" title="2026款广汽丰田铂智3X [上市]">2026款广汽丰田铂智3X</div>
+<div class="cal-event a-mark" title="华境S（五菱×华为合作大型SUV） [上市]">华境S（五菱×华为合作大型SUV</div>
+<div class="cal-event b-mark" title="哈弗大狗PLUS Hi4 [上市]">哈弗大狗PLUS Hi4</div>
+</td>
+<td class="has-event">
+<div class="day-num">9</div>
+<div class="cal-event b-mark" title="领汇e9 [上市]">领汇e9</div>
+<div class="cal-event b-mark" title="吉利博越十周年冠军版SUV [上市]">吉利博越十周年冠军版SUV</div>
+</td>
+<td class="">
+<div class="day-num">10</div>
+</td>
+</tr>
+<tr>
+<td class="">
+<div class="day-num">11</div>
+</td>
+<td class="">
+<div class="day-num">12</div>
+</td>
+<td class="has-event">
+<div class="day-num">13</div>
+<div class="cal-event a-mark" title="方程豹豹5/豹8闪充版 [上市]">方程豹豹5/豹8闪充版</div>
+</td>
+<td class="">
+<div class="day-num">14</div>
+</td>
+<td class=" has-s">
+<div class="day-num">15</div>
+<div class="cal-event s-mark" title="乐道L80（智能双舱大五座旗舰SUV） [上市]">乐道L80（智能双舱大五座旗舰S</div>
+<div class="cal-event s-mark" title="智界V9（鸿蒙智行首款旗舰MPV） [上市]">智界V9（鸿蒙智行首款旗舰MPV</div>
+<div class="cal-event s-mark" title="全新理想L9 [上市]">全新理想L9</div>
+<div class="cal-event more-mark">+1 更多</div>
+</td>
+<td class="">
+<div class="day-num">16</div>
+</td>
+<td class="">
+<div class="day-num">17</div>
+</td>
+</tr>
+<tr>
+<td class="has-event">
+<div class="day-num">18</div>
+<div class="cal-event a-mark" title="腾势N9闪充版 [上市]">腾势N9闪充版</div>
+<div class="cal-event a-mark" title="魏牌V9X [上市]">魏牌V9X</div>
+</td>
+<td class="has-event">
+<div class="day-num">19</div>
+<div class="cal-event a-mark" title="焕新极氪009 [上市]">焕新极氪009</div>
+</td>
+<td class=" has-s">
+<div class="day-num">20</div>
+<div class="cal-event a-mark" title="小鹏GX [上市]">小鹏GX</div>
+<div class="cal-event s-mark" title="全新梅赛德斯-AMG GT纯电四门跑车 [全球首发]">全新梅赛德斯-AMG GT纯电四</div>
+</td>
+<td class=" has-s">
+<div class="day-num">21</div>
+<div class="cal-event s-mark" title="小米YU7 GT（1003马力性能SUV） [上市]">小米YU7 GT（1003马力性</div>
+<div class="cal-event a-mark" title="小米YU7青春版 [上市]">小米YU7青春版</div>
+<div class="cal-event a-mark" title="第三代比亚迪元PLUS（A级闪充SUV） [上市]">第三代比亚迪元PLUS（A级闪充</div>
+<div class="cal-event more-mark">+1 更多</div>
+</td>
+<td class="has-event">
+<div class="day-num">22</div>
+<div class="cal-event a-mark" title="岚图泰山X8 [上市]">岚图泰山X8</div>
+<div class="cal-event a-mark" title="吉利银河星耀7（中级轿车） [上市]">吉利银河星耀7（中级轿车）</div>
+<div class="cal-event b-mark" title="极狐S3（中型纯电轿车） [上市]">极狐S3（中型纯电轿车）</div>
+<div class="cal-event more-mark">+1 更多</div>
+</td>
+<td class="has-event">
+<div class="day-num">23</div>
+<div class="cal-event a-mark" title="新款大众与众06（CEA架构改款纯电中型车） [上市]">新款大众与众06（CEA架构改款</div>
+<div class="cal-event a-mark" title="大众与众07（CEA架构全新纯电中型车） [上市]">大众与众07（CEA架构全新纯电</div>
+</td>
+<td class="">
+<div class="day-num">24</div>
+</td>
+</tr>
+<tr>
+<td class="">
+<div class="day-num">25</div>
+</td>
+<td class="">
+<div class="day-num">26</div>
+</td>
+<td class=" has-s">
+<div class="day-num">27</div>
+<div class="cal-event s-mark" title="新款问界M9 / M9 Ultimate领世加长版 [上市]">新款问界M9 / M9 Ulti</div>
+<div class="cal-event s-mark" title="蔚来ES9 [上市]">蔚来ES9</div>
+</td>
+<td class=" has-s">
+<div class="day-num">28</div>
+<div class="cal-event a-mark" title="比亚迪宋Ultra DM-i [上市]">比亚迪宋Ultra DM-i</div>
+<div class="cal-event b-mark" title="新款吉利星愿 [上市]">新款吉利星愿</div>
+<div class="cal-event b-mark" title="MG 4X [上市]">MG 4X</div>
+<div class="cal-event more-mark">+1 更多</div>
+</td>
+<td class="has-event">
+<div class="day-num">29</div>
+<div class="cal-event a-mark" title="领克10（纯电运动轿车） [上市]">领克10（纯电运动轿车）</div>
+<div class="cal-event a-mark" title="领克10+（高性能纯电轿车） [上市]">领克10+（高性能纯电轿车）</div>
+<div class="cal-event a-mark" title="沃尔沃EX90 [上市]">沃尔沃EX90</div>
+<div class="cal-event more-mark">+4 更多</div>
+</td>
+<td class="has-event">
+<div class="day-num">30</div>
+<div class="cal-event b-mark" title="2026款吉利牛仔 [上市]">2026款吉利牛仔</div>
+</td>
+<td class="">
+<div class="day-num">31</div>
+</td>
+</tr>
+</tbody></table></div>
+<div class="month-block"><h3>2026年6月</h3>
+<table class="cal-grid"><thead><tr>
+<th>一</th>
+<th>二</th>
+<th>三</th>
+<th>四</th>
+<th>五</th>
+<th>六</th>
+<th>日</th>
+</tr></thead><tbody>
+<tr>
+<td class=" has-s">
+<div class="day-num">1</div>
+<div class="cal-event s-mark" title="蔚来ES9 [上市/交付]">蔚来ES9</div>
+</td>
+<td class="has-event">
+<div class="day-num">2</div>
+<div class="cal-event b-mark" title="上海汽车技术展 [展会]">上海汽车技术展</div>
+</td>
+<td class="">
+<div class="day-num">3</div>
+</td>
+<td class="">
+<div class="day-num">4</div>
+</td>
+<td class="has-event">
+<div class="day-num">5</div>
+<div class="cal-event a-mark" title="奔驰全新纯电GLC SUV [预售]">奔驰全新纯电GLC SUV</div>
+</td>
+<td class="has-event">
+<div class="day-num">6</div>
+<div class="cal-event b-mark" title="新款乐道L60开放试驾 [试驾]">新款乐道L60开放试驾</div>
+</td>
+<td class="has-event">
+<div class="day-num">7</div>
+<div class="cal-event a-mark" title="2026粤港澳大湾区车展（5/29-6/7） [展会闭幕]">2026粤港澳大湾区车展（5/2</div>
+</td>
+</tr>
+<tr>
+<td class="">
+<div class="day-num">8</div>
+</td>
+<td class="">
+<div class="day-num">9</div>
+</td>
+<td class="today has-event">
+<div class="day-num">10</div>
+<div class="cal-event a-mark" title="吉利银河星舰7 EV [上市]">吉利银河星舰7 EV</div>
+</td>
+<td class="has-event">
+<div class="day-num">11</div>
+<div class="cal-event a-mark" title="smart精灵#6 EHD [上市]">smart精灵#6 EHD</div>
+<div class="cal-event a-mark" title="新款乐道L60 [上市]">新款乐道L60</div>
+</td>
+<td class="has-event">
+<div class="day-num">12</div>
+<div class="cal-event a-mark" title="昊铂S600 [上市]">昊铂S600</div>
+<div class="cal-event b-mark" title="北京越野BJ30 高光版 [上市]">北京越野BJ30 高光版</div>
+</td>
+<td class="has-event">
+<div class="day-num">13</div>
+<div class="cal-event a-mark" title="第二十八届重庆国际车展 [展会]">第二十八届重庆国际车展</div>
+<div class="cal-event b-mark" title="2026中国汽车重庆论坛 [论坛]">2026中国汽车重庆论坛</div>
+</td>
+<td class="">
+<div class="day-num">14</div>
+</td>
+</tr>
+<tr>
+<td class="">
+<div class="day-num">15</div>
+</td>
+<td class="">
+<div class="day-num">16</div>
+</td>
+<td class="">
+<div class="day-num">17</div>
+</td>
+<td class="">
+<div class="day-num">18</div>
+</td>
+<td class="">
+<div class="day-num">19</div>
+</td>
+<td class="">
+<div class="day-num">20</div>
+</td>
+<td class="">
+<div class="day-num">21</div>
+</td>
+</tr>
+<tr>
+<td class="">
+<div class="day-num">22</div>
+</td>
+<td class="">
+<div class="day-num">23</div>
+</td>
+<td class="">
+<div class="day-num">24</div>
+</td>
+<td class="">
+<div class="day-num">25</div>
+</td>
+<td class="">
+<div class="day-num">26</div>
+</td>
+<td class="">
+<div class="day-num">27</div>
+</td>
+<td class="">
+<div class="day-num">28</div>
+</td>
+</tr>
+<tr>
+<td class="">
+<div class="day-num">29</div>
+</td>
+<td class="">
+<div class="day-num">30</div>
+</td>
+<td class="empty"></td>
+<td class="empty"></td>
+<td class="empty"></td>
+<td class="empty"></td>
+<td class="empty"></td>
+</tr>
+</tbody></table></div>
+    </div>
+
+    <h2 id="sec-upcoming">近7天事件</h2>
+    <div class="upcoming">
+        
+        <div class="upcoming-card">
+            <div class="uc-left">
+                <div class="uc-date">06/10</div>
+                <div class="uc-countdown">今天</div>
+            </div>
+            <div class="uc-body">
+                <div class="uc-title">
+                    <span class="level-badge level-a">A级</span>
+                    吉利银河星舰7 EV
+                </div>
+                <div class="uc-meta">上市 · 800V快充/CLTC 605km续航/Flyme Auto座舱/预计10-15万</div>
+            </div>
+        </div>
+
+        <div class="upcoming-card">
+            <div class="uc-left">
+                <div class="uc-date">06/11</div>
+                <div class="uc-countdown">明天</div>
+            </div>
+            <div class="uc-body">
+                <div class="uc-title">
+                    <span class="level-badge level-a">A级</span>
+                    smart精灵#6 EHD
+                </div>
+                <div class="uc-meta">上市 · smart首款插混轿车/18.99万起/4个版本/奔驰设计+吉利智造/综合续航1675km</div>
+            </div>
+        </div>
+
+        <div class="upcoming-card">
+            <div class="uc-left">
+                <div class="uc-date">06/11</div>
+                <div class="uc-countdown">明天</div>
+            </div>
+            <div class="uc-body">
+                <div class="uc-title">
+                    <span class="level-badge level-a">A级</span>
+                    新款乐道L60
+                </div>
+                <div class="uc-meta">上市 · 106项产品升级/900V碳化硅/全域换电/5nm智驾芯片/粤港澳车展已预售</div>
+            </div>
+        </div>
+
+        <div class="upcoming-card">
+            <div class="uc-left">
+                <div class="uc-date">06/12</div>
+                <div class="uc-countdown">2天后</div>
+            </div>
+            <div class="uc-body">
+                <div class="uc-title">
+                    <span class="level-badge level-a">A级</span>
+                    昊铂S600
+                </div>
+                <div class="uc-meta">上市 · 纯电+增程双动力/权益价18.89万起/22扬声器/全系高阶智驾</div>
+            </div>
+        </div>
+
+        <div class="upcoming-card">
+            <div class="uc-left">
+                <div class="uc-date">06/12</div>
+                <div class="uc-countdown">2天后</div>
+            </div>
+            <div class="uc-body">
+                <div class="uc-title">
+                    <span class="level-badge level-b">B级</span>
+                    北京越野BJ30 高光版
+                </div>
+                <div class="uc-meta">上市 · 方盒子造型升级/三擎四驱HEV混动/第15万台下线里程碑</div>
+            </div>
+        </div>
+
+        <div class="upcoming-card">
+            <div class="uc-left">
+                <div class="uc-date">06/13</div>
+                <div class="uc-countdown">3天后</div>
+            </div>
+            <div class="uc-body">
+                <div class="uc-title">
+                    <span class="level-badge level-a">A级</span>
+                    第二十八届重庆国际车展
+                </div>
+                <div class="uc-meta">展会 · 16万㎡/80+品牌/小米/仰望首次参展</div>
+            </div>
+        </div>
+
+        <div class="upcoming-card">
+            <div class="uc-left">
+                <div class="uc-date">06/13</div>
+                <div class="uc-countdown">3天后</div>
+            </div>
+            <div class="uc-body">
+                <div class="uc-title">
+                    <span class="level-badge level-b">B级</span>
+                    2026中国汽车重庆论坛
+                </div>
+                <div class="uc-meta">论坛 · 同期行业论坛</div>
+            </div>
+        </div>
+
+        <div class="upcoming-card s-card">
+            <div class="uc-left">
+                <div class="uc-date">6月下旬</div>
+                <div class="uc-countdown">待定</div>
+            </div>
+            <div class="uc-body">
+                <div class="uc-title">
+                    <span class="level-badge level-s">S级</span>
+                    尊界S800 Grand Design典藏大观（160-200万）
+                </div>
+                <div class="uc-meta">上市 · 粤港澳车展全球首秀+预售160-200万；预计6月下旬上市；现款S800累计交付18500台</div>
+            </div>
+        </div>
+
+        <div class="upcoming-card s-card">
+            <div class="uc-left">
+                <div class="uc-date">6月中旬（约18日）</div>
+                <div class="uc-countdown">待定</div>
+            </div>
+            <div class="uc-body">
+                <div class="uc-title">
+                    <span class="level-badge level-s">S级</span>
+                    比亚迪大唐<button class="pr-badge" onclick="openPreresearch('pr-比亚迪大唐')">查看预研</button>
+                </div>
+                <div class="uc-meta">上市 · 王朝网旗舰D级SUV/预售超10万台/25-32万/西安上市/950km续航/1000V平台</div>
+            </div>
+        </div>
+
+        <div class="upcoming-card s-card">
+            <div class="uc-left">
+                <div class="uc-date">6月底</div>
+                <div class="uc-countdown">待定</div>
+            </div>
+            <div class="uc-body">
+                <div class="uc-title">
+                    <span class="level-badge level-s">S级</span>
+                    全新理想L8
+                </div>
+                <div class="uc-meta">发布 · 理想主力换代车型</div>
+            </div>
+        </div>
+
+        <div class="upcoming-card s-card">
+            <div class="uc-left">
+                <div class="uc-date">7月</div>
+                <div class="uc-countdown">待定</div>
+            </div>
+            <div class="uc-body">
+                <div class="uc-title">
+                    <span class="level-badge level-s">S级</span>
+                    理想i8（家庭六座纯电SUV）
+                </div>
+                <div class="uc-meta">发布 · 理想CEO李想官宣7月发布，9月交付</div>
+            </div>
+        </div>
+
+        <div class="upcoming-card s-card">
+            <div class="uc-left">
+                <div class="uc-date">7月</div>
+                <div class="uc-countdown">待定</div>
+            </div>
+            <div class="uc-body">
+                <div class="uc-title">
+                    <span class="level-badge level-s">S级</span>
+                    小米昆仑N3（YU9增程SUV）
+                </div>
+                <div class="uc-meta">上市 · 小米首款增程/5.3m全尺寸旗舰/800V平台/独立子品牌&quot;寻天&quot;/对标理想L9</div>
+            </div>
+        </div>
+
+        <div class="upcoming-card s-card">
+            <div class="uc-left">
+                <div class="uc-date">9月</div>
+                <div class="uc-countdown">待定</div>
+            </div>
+            <div class="uc-body">
+                <div class="uc-title">
+                    <span class="level-badge level-s">S级</span>
+                    理想i6（大众化纯电大五座SUV）
+                </div>
+                <div class="uc-meta">发布 · 李想官宣9月发布，瞄准20万级市场</div>
+            </div>
+        </div>
+
+        <div class="upcoming-card s-card">
+            <div class="uc-left">
+                <div class="uc-date">四季度</div>
+                <div class="uc-countdown">待定</div>
+            </div>
+            <div class="uc-body">
+                <div class="uc-title">
+                    <span class="level-badge level-s">S级</span>
+                    小米首款增程全尺寸SUV（或命名YU9）
+                </div>
+                <div class="uc-meta">上市 · 小米2026年最重磅车型之一</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-bar" id="sec-events">
+        <button class="tab-btn active" data-tab="all">全部<span class="tab-count">75</span></button>
+        <button class="tab-btn" data-tab="s">S级事件<span class="tab-count">16</span></button>
+        <button class="tab-btn" data-tab="pending">待跟踪<span class="tab-count">28</span></button>
+        <button class="tab-btn" data-tab="completed">已完成<span class="tab-count">46</span></button>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>日期</th>
+                    <th>类型</th>
+                    <th>车型/主题</th>
+                    <th>状态</th>
+                    <th>备注</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">04月08日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                东风日产NX8
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成（4/8上市）</span></td>
+            <td class="note-col">限时14.99万起/天演架构2.0首款/纯电+增程双动力</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月08日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                2026款广汽丰田铂智3X
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月08日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                华境S（五菱×华为合作大型SUV）
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="b" data-status="completed">
+            <td class="date-col">05月08日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-b">B级</span>
+                哈弗大狗PLUS Hi4
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="b" data-status="completed">
+            <td class="date-col">05月09日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-b">B级</span>
+                领汇e9
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="b" data-status="completed">
+            <td class="date-col">05月09日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-b">B级</span>
+                吉利博越十周年冠军版SUV
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月13日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                方程豹豹5/豹8闪充版
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="s" data-status="completed">
+            <td class="date-col">05月15日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-s">S级</span>
+                乐道L80（智能双舱大五座旗舰SUV）
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="s" data-status="completed">
+            <td class="date-col">05月15日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-s">S级</span>
+                智界V9（鸿蒙智行首款旗舰MPV）
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成（已补录情报）</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="s" data-status="completed">
+            <td class="date-col">05月15日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-s">S级</span>
+                全新理想L9
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月15日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                哈弗猛龙PLUS
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月18日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                腾势N9闪充版
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月18日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                魏牌V9X
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月19日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                焕新极氪009
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月20日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                小鹏GX <button class="pr-badge" onclick="openPreresearch('pr-小鹏GX')">预研</button>
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="s" data-status="completed">
+            <td class="date-col">05月20日</td>
+            <td class="type-col">全球首发</td>
+            <td class="name-col">
+                <span class="level-badge level-s">S级</span>
+                全新梅赛德斯-AMG GT纯电四门跑车
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="s" data-status="completed">
+            <td class="date-col">05月21日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-s">S级</span>
+                小米YU7 GT（1003马力性能SUV）
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月21日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                小米YU7青春版
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月21日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                第三代比亚迪元PLUS（A级闪充SUV）
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月21日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                BJ40增程长续航版
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月22日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                岚图泰山X8 <button class="pr-badge" onclick="openPreresearch('pr-岚图泰山X8')">预研</button>
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月22日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                吉利银河星耀7（中级轿车）
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="b" data-status="completed">
+            <td class="date-col">05月22日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-b">B级</span>
+                极狐S3（中型纯电轿车）
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="b" data-status="completed">
+            <td class="date-col">05月22日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-b">B级</span>
+                五菱缤果Pro（纯电小型车）
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月23日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                新款大众与众06（CEA架构改款纯电中型车）
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月23日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                大众与众07（CEA架构全新纯电中型车）
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="s" data-status="completed">
+            <td class="date-col">05月27日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-s">S级</span>
+                新款问界M9 / M9 Ultimate领世加长版
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="s" data-status="completed">
+            <td class="date-col">05月27日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-s">S级</span>
+                蔚来ES9
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月28日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                比亚迪宋Ultra DM-i
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="b" data-status="completed">
+            <td class="date-col">05月28日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-b">B级</span>
+                新款吉利星愿
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="b" data-status="completed">
+            <td class="date-col">05月28日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-b">B级</span>
+                MG 4X
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="s" data-status="completed">
+            <td class="date-col">05月28日</td>
+            <td class="type-col">发布会</td>
+            <td class="name-col">
+                <span class="level-badge level-s">S级</span>
+                比亚迪智能化战略发布会（全民智驾2.0）
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月29日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                领克10（纯电运动轿车）
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月29日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                领克10+（高性能纯电轿车）
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月29日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                沃尔沃EX90
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月29日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                沃尔沃ES90
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月29日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                奥迪E7X
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">05月29日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                上汽大众帕萨特 ePro / 途观L ePro
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="b" data-status="completed">
+            <td class="date-col">05月29日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-b">B级</span>
+                东风奕派M8
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="b" data-status="completed">
+            <td class="date-col">05月30日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-b">B级</span>
+                2026款吉利牛仔
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col"></td>
+        </tr>
+        
+
+        <tr data-level="s" data-status="completed">
+            <td class="date-col">06月01日</td>
+            <td class="type-col">上市/交付</td>
+            <td class="name-col">
+                <span class="level-badge level-s">S级</span>
+                蔚来ES9
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成（5/27上市）</span></td>
+            <td class="note-col">5月27日已上市，6月1日开启批量交付</td>
+        </tr>
+        
+
+        <tr data-level="b" data-status="completed">
+            <td class="date-col">06月02日</td>
+            <td class="type-col">展会</td>
+            <td class="name-col">
+                <span class="level-badge level-b">B级</span>
+                上海汽车技术展
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col">上海世博展览馆/汽车技术专项展</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">06月05日</td>
+            <td class="type-col">预售</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                奔驰全新纯电GLC SUV
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col">800V架构/4.95米车长/3027mm轴距/空气悬挂+后轮转向/7月正式上市</td>
+        </tr>
+        
+
+        <tr data-level="b" data-status="completed">
+            <td class="date-col">06月06日</td>
+            <td class="type-col">试驾</td>
+            <td class="name-col">
+                <span class="level-badge level-b">B级</span>
+                新款乐道L60开放试驾
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col">全国门店同步开放/6月11日上市</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">06月07日</td>
+            <td class="type-col">展会闭幕</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                2026粤港澳大湾区车展（5/29-6/7）
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col">深圳/100+品牌/1300+车型/鸿蒙智行五界同台/尚界H5预售16.98万起/猛士M817预售37-42万/沃尔沃EX90+ES90上市/尊界S800 Grand Design首秀</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">06月10日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                吉利银河星舰7 EV
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">待跟踪</span></td>
+            <td class="note-col">800V快充/CLTC 605km续航/Flyme Auto座舱/预计10-15万</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">06月11日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                smart精灵#6 EHD
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">待跟踪</span></td>
+            <td class="note-col">smart首款插混轿车/18.99万起/4个版本/奔驰设计+吉利智造/综合续航1675km</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">06月11日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                新款乐道L60
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">待跟踪</span></td>
+            <td class="note-col">106项产品升级/900V碳化硅/全域换电/5nm智驾芯片/粤港澳车展已预售</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">06月12日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                昊铂S600
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">待跟踪</span></td>
+            <td class="note-col">纯电+增程双动力/权益价18.89万起/22扬声器/全系高阶智驾</td>
+        </tr>
+        
+
+        <tr data-level="b" data-status="pending">
+            <td class="date-col">06月12日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-b">B级</span>
+                北京越野BJ30 高光版
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">待跟踪</span></td>
+            <td class="note-col">方盒子造型升级/三擎四驱HEV混动/第15万台下线里程碑</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">06月13日</td>
+            <td class="type-col">展会</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                第二十八届重庆国际车展
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">待跟踪</span></td>
+            <td class="note-col">16万㎡/80+品牌/小米/仰望首次参展</td>
+        </tr>
+        
+
+        <tr data-level="b" data-status="pending">
+            <td class="date-col">06月13日</td>
+            <td class="type-col">论坛</td>
+            <td class="name-col">
+                <span class="level-badge level-b">B级</span>
+                2026中国汽车重庆论坛
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">待跟踪</span></td>
+            <td class="note-col">同期行业论坛</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">07月24日</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                2026款吉利银河E5
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">远期</span></td>
+            <td class="note-col">续航和智能升级</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">11月</td>
+            <td class="type-col">复盘</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                魏牌V9X上市6个月销量/口碑复盘
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">远期</span></td>
+            <td class="note-col">交付物：`06-交付物/2026-05-19-魏牌V9X上市洞察/`；需跟踪：销量数据、终端优惠、用户口碑关键词、价格变动</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">2026年内</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                全新国产奔驰GLC纯电
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">远期</span></td>
+            <td class="note-col">合资电动化2.0代表车型</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">2026年内</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                比亚迪海狮08
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">远期</span></td>
+            <td class="note-col">大型SUV，或搭载后轮转向</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">6月</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                比亚迪海狮08
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">待跟踪</span></td>
+            <td class="note-col">大型SUV/已开启预售/6月正式上市</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="completed">
+            <td class="date-col">6月</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                沃尔沃EX90/ES90
+            </td>
+            <td class="status-col"><span class="status-badge status-done">已完成</span></td>
+            <td class="note-col">粤港澳车展上市</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">6月</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                奕境旗舰大六座SUV（东风×华为）
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">待确认</span></td>
+            <td class="note-col">北京车展亮相，上半年推向市场</td>
+        </tr>
+        
+
+        <tr data-level="b" data-status="other">
+            <td class="date-col">6月</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-b">B级</span>
+                一汽悦意08（新生代智享轿跑）
+            </td>
+            <td class="status-col"><span class="status-badge status-normal">预售中</span></td>
+            <td class="note-col">预售10.49-14.39万/粤港澳车展亮相</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">6月上旬</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                腾势N8L闪充版
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">待跟踪</span></td>
+            <td class="note-col">搭载第二代刀片电池/天神之眼5.0/预售价35-40万</td>
+        </tr>
+        
+
+        <tr data-level="s" data-status="pending">
+            <td class="date-col">6月下旬</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-s">S级</span>
+                尊界S800 Grand Design典藏大观（160-200万）
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">待跟踪</span></td>
+            <td class="note-col">粤港澳车展全球首秀+预售160-200万；预计6月下旬上市；现款S800累计交付18500台</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">6月中下旬</td>
+            <td class="type-col">上市交付</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                启境GT7（广汽×华为合作猎装轿跑）
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">待跟踪</span></td>
+            <td class="note-col">预售21.99-30.99万/250kW最大功率</td>
+        </tr>
+        
+
+        <tr data-level="s" data-status="pending">
+            <td class="date-col">6月中旬（约18日）</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-s">S级</span>
+                比亚迪大唐 <button class="pr-badge" onclick="openPreresearch('pr-比亚迪大唐')">预研</button>
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">待跟踪</span></td>
+            <td class="note-col">王朝网旗舰D级SUV/预售超10万台/25-32万/西安上市/950km续航/1000V平台</td>
+        </tr>
+        
+
+        <tr data-level="s" data-status="pending">
+            <td class="date-col">6月底</td>
+            <td class="type-col">发布</td>
+            <td class="name-col">
+                <span class="level-badge level-s">S级</span>
+                全新理想L8
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">待跟踪</span></td>
+            <td class="note-col">理想主力换代车型</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">7月</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                奔驰全新纯电GLC SUV
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">远期</span></td>
+            <td class="note-col">6月5日预售/7月正式上市/800V/国产化</td>
+        </tr>
+        
+
+        <tr data-level="s" data-status="pending">
+            <td class="date-col">7月</td>
+            <td class="type-col">发布</td>
+            <td class="name-col">
+                <span class="level-badge level-s">S级</span>
+                理想i8（家庭六座纯电SUV）
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">远期</span></td>
+            <td class="note-col">理想CEO李想官宣7月发布，9月交付</td>
+        </tr>
+        
+
+        <tr data-level="s" data-status="pending">
+            <td class="date-col">7月</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-s">S级</span>
+                小米昆仑N3（YU9增程SUV）
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">远期</span></td>
+            <td class="note-col">小米首款增程/5.3m全尺寸旗舰/800V平台/独立子品牌&quot;寻天&quot;/对标理想L9</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">7月</td>
+            <td class="type-col">发布</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                奔驰C级EQ
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">远期</span></td>
+            <td class="note-col">纯电C级轿车</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">8月</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                全新一代 smart精灵#1
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">远期</span></td>
+            <td class="note-col">换代车型/智驾硬件大幅升级</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">8月</td>
+            <td class="type-col">展示</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                特斯拉新一代Roadster
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">远期</span></td>
+            <td class="note-col">旗舰纯电超跑公开展示</td>
+        </tr>
+        
+
+        <tr data-level="s" data-status="pending">
+            <td class="date-col">9月</td>
+            <td class="type-col">发布</td>
+            <td class="name-col">
+                <span class="level-badge level-s">S级</span>
+                理想i6（大众化纯电大五座SUV）
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">远期</span></td>
+            <td class="note-col">李想官宣9月发布，瞄准20万级市场</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">Q3</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                东风奕派M8（华为乾崑大六座SUV）
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">远期</span></td>
+            <td class="note-col">5月全球首发，预计Q3上市</td>
+        </tr>
+        
+
+        <tr data-level="a" data-status="pending">
+            <td class="date-col">下半年</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-a">A级</span>
+                新世代宝马iX3长轴距版
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">远期</span></td>
+            <td class="note-col">合资电动化2.0代表车型</td>
+        </tr>
+        
+
+        <tr data-level="s" data-status="pending">
+            <td class="date-col">四季度</td>
+            <td class="type-col">上市</td>
+            <td class="name-col">
+                <span class="level-badge level-s">S级</span>
+                小米首款增程全尺寸SUV（或命名YU9）
+            </td>
+            <td class="status-col"><span class="status-badge status-pending">远期</span></td>
+            <td class="note-col">小米2026年最重磅车型之一</td>
+        </tr>
+        
+            </tbody>
+        </table>
+    </div>
+
+    <div class="footer">
+        由 generate_calendar_html.py 自动生成 · 最后更新：2026-06-10
+    </div>
+
+    <!-- 预研报告 template 标签（隐藏） -->
+    <template id="pr-小鹏GX"># 小鹏GX 事件预研简报
+
+&gt; **预研日期**：2026-05-20
+&gt; **目标事件**：上市 | 2026年5月20日（今日）
+&gt; **事件级别**：A级
+&gt; **预研深度**：核心4维度
+&gt; **有效期**：至2026-05-21
+
+---
+
+## 一句话结论
+
+&gt; 小鹏GX是小鹏冲击40万高端市场的豪赌——2250TOPS算力+线控转向+双动力路线，技术天花板拉满，但营销争议不断（"揽胜平替"翻车、销管费用率24.9%却被称为"营销拉胯"）。今天发布会核心看点是最终售价是否击穿35万——低于预期则"技术普惠"叙事成立，高于预期则坐实"性价比不足"质疑。
+
+---
+
+## 市场热度快照
+
+- **热度定性**：高（营销争议反向推高关注度）
+- **关键数据**：预售39.98万元起；首批用户以小鹏老车主+智驾爱好者为主
+- **情绪基调**：两极分化（小鹏粉丝高度期待 vs 路人群体强烈质疑）
+- **信源**：小鹏官网（A级）| 汽车之家（B级）| 新浪财经（B级）
+
+---
+
+## 已知信息基线
+
+### 已确认事实
+- 定位"AI新豪华大六座旗舰SUV"，车长约5.2米，大六座布局
+- 预售价39.98万元（纯电旗舰版/超级增程旗舰版同价）
+- 双动力：纯电四驱续航750km / 超级增程纯电430km综合1585km
+- 4颗图灵AI芯片，整车算力2250-3000TOPS，L4级智驾能力
+- 全球首发博世新一代线控转向 + 线控后轮转向
+- 17.3英寸3K中控屏，NAPPA真皮，前两排加热/通风/按摩
+- 天地门式尾门设计，6款配色
+- 基于SEPA 3.0物理AI架构打造
+
+### 待确认/传闻
+- 最终售价——市场预测主销35万左右，起售可能下探30万（B级-媒体分析）
+- 是否有更多配置版本——预售仅旗舰版，上市可能增推中低配（C级-传闻）
+- 首批交付时间——尚未公布
+
+---
+
+## 争议焦点预判
+
+### 焦点1：40万定价的"智驾溢价"是否被高估
+- 正方：3000TOPS算力+线控转向+端到端大模型，同级无对手
+- 反方：智能驾驶在40万价位段的价值感知弱于20-30万段，用户更看重品牌和空间
+- 传播建议：**值得深度讨论**，"技术值不值40万"是天然争议话题
+
+### 焦点2："揽胜平替"营销翻车
+- 事件：多个自媒体将GX对标路虎揽胜，引发"蹭豪华品牌"质疑
+- 正方：尺寸和气场确实可比
+- 反方：应靠原创技术建立品牌标签，而非蹭热度
+- 传播建议：**谨慎使用**，避免被归入"小鹏营销翻车"阵营
+
+### 焦点3：销管费用率24.9%却"营销拉胯"的悖论
+- 数据：小鹏销管费用率24.9%，理想仅12.5%，蔚来也低于小鹏
+- 讨论：钱花在哪了？效果为何不显？营销效率是核心质疑
+- 传播建议：**可作为"品牌管理"角度的深度选题**
+
+---
+
+## 营销方向建议
+
+### 方向1："3000TOPS算力到底能干什么？小鹏GX技术拆解"（推荐指数：★★★★★）
+- **切入角度**：用大白话解释图灵芯片+线控转向+端到端大模型的实际体验
+- **目标受众**：科技爱好者、智驾关注者
+- **传播理由**：技术科普类内容长尾流量好，且竞品中无人系统性解读过
+- **风险提示**：避免过度技术化，必须用场景类比降维表达
+
+### 方向2："小鹏GX vs 问界M9 vs 理想L9：40万旗舰SUV怎么选？"（推荐指数：★★★★）
+- **切入角度**：三车横评，从智能/空间/动力/品牌四个维度对比
+- **目标受众**：有购车预算的准车主
+- **传播理由**：横评是流量密码，且三车正好覆盖华为系/理想系/小鹏系
+- **风险提示**：需实测数据支撑，纯参数对比说服力有限
+
+### 方向3："小鹏GX上市价大猜想：35万还是30万？"（推荐指数：★★★★）
+- **切入角度**：发布会前做价格预测+预测逻辑，发布会后快速验证
+- **目标受众**：关注价格决策的潜在用户
+- **传播理由**：价格悬念是最强的传播钩子，发布前发预测、发布后发验证
+- **风险提示**：预测偏差大可能损害公信力，需附"猜测依据"
+
+### 方向4："小鹏的营销到底出了什么问题？"（推荐指数：★★★）
+- **切入角度**：从24.9%销管费用率切入，分析小鹏品牌建设的结构性问题
+- **目标受众**：行业观察者、汽车媒体人
+- **传播理由**：争议性话题，评论区分歧大
+- **风险提示**：偏行业分析，非普通消费者关注点，流量天花板有限
+
+---
+
+## 预研缺口
+
+1. 最终上市售价和配置版本——今天发布会后确认
+2. 首批交付时间和覆盖范围——尚未公布
+3. 与问界M9/理想L9的实际驾驶对比——目前仅参数级
+4. 用户真实试驾反馈——发布会后才可能出现
+
+---
+
+## 建议行动
+
+1. **事件前（现在~发布会）**：发布"价格预测"内容抢占悬念热度
+2. **事件当天（发布会进行中）**：实时跟踪售价公布，第一时间产出"售价解析+竞品速评"
+3. **事件后（5月21日起）**：关注首批媒体试驾和用户反馈，准备"三车横评"选题
+
+---
+
+*信源评级遵循四级制：A级=官方/权威 | B级=头部媒体 | C级=自媒体/社媒 | D级=无法核实*
+*预研执行：Collector 模式E | 搜索调用：6次*
+*信源：[小鹏官网](https://www.xiaopeng.com/news/company_news/5552.html) | [汽车之家参数配置](https://www.xiaopeng.com/gx/configuration.html) | [百度有驾-40万豪赌分析](https://youjia.baidu.com/view/articleDetail/9760448149500994257) | [新浪-营销争议](https://www.sina.cn/news/detail/5288390492691118.html) | [车家号-降维打击与短板](https://chejiahao.m.autohome.com.cn/info/25406936) | [什么值得买-用户口碑](https://post.smzdm.com/p/awm4v6eg)*
+</template>
+    <template id="pr-岚图泰山X8"># 岚图泰山X8 事件预研简报
+
+&gt; **预研日期**：2026-05-20
+&gt; **目标事件**：上市 | 2026年5月22日
+&gt; **事件级别**：A级（预研评估升级为S级）
+&gt; **预研深度**：核心4维度
+&gt; **有效期**：至2026-05-23
+
+---
+
+## 一句话结论
+
+&gt; 岚图泰山X8预售13天4万订单、50%BBA用户置换，市场热度已超A级行动阈值。上市当天核心看点是最终售价是否击穿预售价30.29万底线——如果出现"惊喜价"，将引爆"BBA车主集体叛逃"话题，这是当前最佳内容切入点。
+
+---
+
+## 市场热度快照
+
+- **热度定性**：极高（预售数据达S级水平）
+- **关键数据**：预售20小时破2万台；13天累计破4万台；90%用户选高配（Ultra/Ultra+）
+- **情绪基调**：期待 + 两极分化（核心客群高度认可，围观用户对30万+定价有质疑）
+- **用户画像**：50%来自BBA置换；60%为IT/金融/公务员/教师群体
+- **信源**：新浪汽车（A级）| 潮新闻（B级）
+
+---
+
+## 已知信息基线
+
+### 已确认事实
+- 定位"庭院级大五座SUV"，车身5200×2025×1814mm，座舱6.1平方米
+- 预售价格区间：30.29万~38.99万元，共5款配置
+- 双动力：PHEV（1.5T插混）+ EV纯电（最高续航603km）
+- 四激光雷达方案（896线），三腔空气悬架
+- 首发鸿蒙座舱5.2 + 华为双15.6英寸双联屏（2K分辨率）
+- 一键成床功能（2.1米大床）
+- 岚图已布局专利6,102件，五大技术底座
+
+### 待确认/传闻
+- 最终上市售价——预计低于预售价，形成"超预期"传播（B级-媒体分析）
+- 首批交付时间表——预售4万订单的兑现能力（C级-传闻）
+
+---
+
+## 争议焦点预判
+
+### 焦点1：大五座路线 vs 六/七座主流
+- 正方：大五座空间体验碾压同级六/七座第三排，"少而精"是家庭用户真实需求
+- 反方：中国市场"座位焦虑"根深蒂固，大五座市场容量有限
+- 传播建议：**值得深度讨论**，"大五座vs六七座"是2026年SUV市场最热话题赛道
+
+### 焦点2：30万+国产SUV的定价天花板
+- 正方：预售4万台、90%选高配，说明核心客群接受定价
+- 反方：围观用户认为30万买国产SUV仍需勇气，"岚图凭什么？"
+- 传播建议：**适度触及**，结合BBA置换数据形成"价值重构"论据
+
+### 焦点3："五座新王"自称是否过早
+- 媒体反应两极：部分认为产品力支撑，部分认为需交付数据验证
+- 传播建议：**不主动挑起**，但在竞品横评中客观对比
+
+---
+
+## 营销方向建议
+
+### 方向1："BBA车主为什么集体叛逃岚图？"（推荐指数：★★★★★）
+- **切入角度**：50%预售用户来自合资豪华品牌，深度解读这群人的决策逻辑
+- **目标受众**：25-40岁有购车/换车计划的用户
+- **传播理由**：直击"国产vs合资"永恒话题，评论区必站队
+- **风险提示**：避免"贬低BBA"倾向，聚焦"国产车进步"叙事
+
+### 方向2："庭院级SUV到底是什么体验？"（推荐指数：★★★★）
+- **切入角度**：6.1平方米座舱 + 一键成床，用生活场景类比拆解空间概念
+- **目标受众**：家庭用户，尤其关注空间和实用性的群体
+- **传播理由**："庭院级"概念有记忆点，视觉化潜力强（适合视频/图文）
+- **风险提示**：需要实车体验素材支撑，纯参数描述效果有限
+
+### 方向3："鸿蒙座舱5.2首发，华为赋能岚图到底有多深？"（推荐指数：★★★★）
+- **切入角度**：技术解读鸿蒙5.2 vs 问界鸿蒙座舱的差异，华为生态链深度
+- **目标受众**：科技爱好者、华为生态用户
+- **传播理由**：鸿蒙5.2首发是独家信息差，技术党关注度高
+- **风险提示**：需要对比实测数据，纯参数对比易被质疑
+
+### 方向4："4万预售订单背后：谁在买岚图泰山X8？"（推荐指数：★★★）
+- **切入角度**：用户画像数据解读——60%体制内/高知，颠覆"新能源车主=互联网人"刻板印象
+- **目标受众**：泛汽车消费人群
+- **传播理由**：数据驱动选题，有新奇感和反差感
+- **风险提示**：官方数据可能存在选择性呈现，需交叉验证
+
+---
+
+## 预研缺口
+
+1. 最终上市售价——决定传播方向（低于预期→"性价比之王"；高于预期→"凭什么"）
+2. 首批交付时间和数量——判断"预售4万"中真实订单vs跟风比例
+3. 鸿蒙座舱5.2的实际体验与问界鸿蒙座舱的差异——目前仅有官方描述，缺独立评测
+4. 与理想L8、问界M8的直接对比数据——目前仅有参数级对比，缺驾驶/空间实测
+
+---
+
+## 建议行动
+
+1. **事件前（现在~5月22日）**：准备好3个方向（BBA叛逃/庭院级空间/鸿蒙5.2）的内容框架和素材清单，上市价公布后立即填充
+2. **事件当天（5月22日）**：关注最终售价和新增配置，第一时间产出"售价解析+竞品速评"
+3. **事件后（5月23日起）**：关注首批媒体试驾反馈和用户真实评价，补充预研缺口
+
+---
+
+*信源评级遵循四级制：A级=官方/权威 | B级=头部媒体 | C级=自媒体/社媒 | D级=无法核实*
+*预研执行：Collector 模式E | 搜索调用：8次*
+</template>
+    <template id="pr-比亚迪大唐"># 比亚迪大唐 S级预研简报
+
+&gt; 预研日期：2026-06-07
+&gt; 事件：比亚迪大唐EV 6月中旬（约18日）西安上市
+&gt; 事件级别：S级（新车正式上市）
+&gt; 预研触发规则：S级事件距发生 ≤14 天
+
+---
+
+## 一、基本信息
+
+| 项目 | 内容 |
+|------|------|
+| 车型 | 比亚迪大唐 EV（王朝网首款D级旗舰SUV） |
+| 上市日期 | 约2026年6月18日（6月中旬） |
+| 上市地点 | 西安 |
+| 预售日期 | 2026年4月24日（北京车展） |
+| 预售价格 | 25-32万元 |
+| 预售订单 | 24h破3万 → 14天破10万（官方确认） |
+| 官方页面 | https://www.byd.com/cn/dynasty-home/models/tang/da-tang-ev |
+
+---
+
+## 二、核心参数
+
+### 2.1 尺寸与空间
+
+| 参数 | 数值 | 对比（理想L9 / 问界M9） |
+|------|------|------------------------|
+| 车长 | 5302mm | 5218mm / 5230mm |
+| 车宽 | 1999mm | 1998mm / 1999mm |
+| 车高 | 1800mm | 1800mm / 1800mm |
+| 轴距 | **3130mm** | 3105mm / 3110mm |
+| 座舱面积 | 6.34㎡ | - |
+| 座椅布局 | 2+2+3 七座 | 2+2+2 六座 / 2+2+2 六座 |
+| 转弯半径 | **5.2m**（14°后轮转向） | - / - |
+
+### 2.2 动力与续航
+
+| 版本 | 驱动 | 电机功率 | CLTC续航 | 预售价格 |
+|------|------|---------|---------|---------|
+| 800KM 后驱版 | 后置后驱 | 300kW | 800km | ~25万 |
+| 950KM 后驱版 | 后置后驱 | 370kW | **950km** | ~28万 |
+| 850KM 四驱版 | 双电机四驱 | 215kW+370kW | 850km | ~32万 |
+
+- 零百加速：**3.9s**（四驱版）
+- 电池：第二代刀片电池（磷酸铁锂），130kWh
+- 平台：超级e平台，全域1000V高压架构
+- 插混版（DM-i）也有规划：WLTC纯电续航342km，综合续航1860km
+
+### 2.3 充电（兆瓦闪充 2.0）
+
+| 指标 | 数值 |
+|------|------|
+| 充电倍率 | 10C |
+| 峰值功率 | 1000kW（1MW） |
+| 峰值速度 | 1秒2公里 |
+| 10%→70% | **5分钟** |
+| 10%→97% | **9分钟** |
+| -30℃极寒补能 | 仅比常温多约3分钟 |
+
+### 2.4 底盘与操控
+
+- 前双叉臂 + 后五连杆独立悬架
+- **云辇-A 智能空气悬架**（双腔空气弹簧）
+- 道路预瞄系统
+- **14°后轮转向**（5.2m转弯半径，紧凑型轿车级别）
+
+### 2.5 智能化
+
+| 配置 | 详情 |
+|------|------|
+| 智驾系统 | 天神之眼 B 高阶智驾 |
+| 激光雷达 | 全系标配速腾聚创数字化激光雷达 |
+| 芯片 | 3nm车规级芯片 |
+| AI座舱 | 集成豆包、千问、DeepSeek等大模型 |
+| 座舱设计 | 三屏联动（全液晶仪表+悬浮中控+副驾屏） |
+
+### 2.6 内饰亮点
+
+- 第二排：双零重力航空座椅
+- 靠背最大调节角度：146°
+- 70°电动腿托
+- 标配通风、加热、10点式按摩
+- 菱形缝线工艺
+
+---
+
+## 三、竞品对比
+
+### 3.1 核心竞品矩阵
+
+| 维度 | 比亚迪大唐 | 理想L9 Livis | 问界M9 |
+|------|-----------|-------------|--------|
+| 起售价 | **25万** | 50.98万 | 49.98万 |
+| 动力形式 | 纯电 | 增程 | 增程/纯电 |
+| 纯电续航 | **950km** | 420km | 630km（纯电版） |
+| 轴距 | **3130mm** | 3105mm | 3110mm |
+| 零百加速 | **3.9s** | 5.3s | 4.3s |
+| 座椅布局 | 七座（2+2+3） | 六座（2+2+2） | 六座（2+2+2） |
+| 空悬 | 云辇-A双腔 | CDC | 空悬+CDC |
+| 后轮转向 | ✅ 14° | ❌ | ❌ |
+| 智驾 | 天神之眼B | 理想AD Max | 华为ADS 3.0 |
+| 快充 | 兆瓦闪充9分钟97% | 400V平台 | 800V平台 |
+
+### 3.2 市场定位差异
+
+- **大唐 = 价格刺客**：同尺寸+更高配置，价格仅为竞品的50%
+- **理想L9 = 家庭场景之王**：六座布局更舒适、增程无焦虑、生态成熟
+- **问界M9 = 智驾天花板**：华为ADS 3.0遥遥领先、品牌溢价高
+
+---
+
+## 四、市场热度数据
+
+| 指标 | 数据 |
+|------|------|
+| 预售24h订单 | 30,000台（官方） |
+| 预售14天订单 | 100,000+台（官方，路天微博确认） |
+| 店均新增订单 | 35-45台/店 |
+| 3月18日话题阅读量 | 单平台破亿 |
+| 官网访问量 | 预售公布当天短暂卡顿 |
+| 核心城市 | 北京、郑州、重庆等一线爆单 |
+
+### 争议点
+
+1. **10万订单真实性**：早期48h/72h数据被质疑为"假数据"，后路天官宣确认
+2. **第三排空间**：170cm乘客腿部仅3指余量，长途满载局促
+3. **极寒续航缩水**：官方未公布低温续航打折率
+4. **普通快充桩体验**：兆瓦闪充需要专用桩，普通快充速度无优势
+5. **智驾成熟度**：天神之眼B尚在追赶阶段，落后华为/小鹏
+
+---
+
+## 五、核心卖点提炼（内容选题角度）
+
+### A. 爆款角度（高流量潜力）
+
+| # | 角度 | 核心钩子 | 目标受众 |
+|---|------|---------|---------|
+| 1 | **价格颠覆** | "25万买到50万级全尺寸SUV" | 价格敏感型用户 |
+| 2 | **续航之王** | "950km续航+9分钟满电" | 续航焦虑用户 |
+| 3 | **速度怪兽** | "3.9秒破百，5.2米大车比轿车灵活" | 性能爱好者 |
+
+### B. 深度角度（专业内容）
+
+| # | 角度 | 核心钩子 | 目标受众 |
+|---|------|---------|---------|
+| 4 | **技术解读** | "第二代刀片电池+兆瓦闪充2.0，油电同速" | 技术极客 |
+| 5 | **竞品拆解** | "大唐 vs 理想L9 vs 问界M9，谁才是全尺寸SUV之王？" | 购车决策者 |
+| 6 | **品牌战略** | "比亚迪王朝网旗舰，从10万到30万的品牌向上" | 行业观察者 |
+
+### C. 话题角度（社交传播）
+
+| # | 角度 | 核心钩子 |
+|---|------|---------|
+| 7 | 后轮转向实测 | "5.3米大车钻胡同，后轮转向有多爽？" |
+| 8 | 七座vs六座 | "七座大唐和六座L9，家庭用车选谁？" |
+| 9 | 闪充挑战 | "9分钟充电实测，真有那么快？" |
+
+---
+
+## 六、关键风险提示
+
+1. **上市价格可能高于预售**：比亚迪近期多款车型上市价高于预售价5-8%
+2. **首批交付等待期可能较长**：10万+订单排队，交付压力巨大
+3. **竞品反击**：理想L8（6月底发布）、问界M9改款可能抢占窗口
+4. **兆瓦闪充桩覆盖率**：目前兆瓦闪充站建设进度未知
+5. **智驾口碑尚未建立**：天神之眼B需要大量实测验证
+
+---
+
+## 七、建议行动
+
+### 上市前（6/7-6/17）
+
+- [ ] 关注比亚迪官方预热内容（王传福/路天社交媒体）
+- [ ] 跟踪媒体试驾活动（通常上市前1-2周）
+- [ ] 准备竞品对比素材（理想L9、问界M9参数表）
+- [ ] 预约上市发布会直播/现场
+
+### 上市日（约6/18）
+
+- [ ] 第一时间获取正式售价和配置表
+- [ ] 与预售价对比分析（涨/降/平）
+- [ ] 即时发布短内容（朋友圈/视频号/小红书）
+
+### 上市后（6/18+）
+
+- [ ] 选题1：上市售价深度解读
+- [ ] 选题2：竞品横评（大唐 vs L9 vs M9）
+- [ ] 选题3：兆瓦闪充实测体验
+
+---
+
+*预研完成时间：2026-06-07*
+*情报来源：新华网、汽车之家、OFweek、百度有驾、搜狐汽车、比亚迪官网*
+</template>
+
+    <!-- 预研报告弹窗 -->
+    <div id="pr-modal-overlay" class="pr-overlay" onclick="closePreresearch(event)">
+        <div class="pr-modal" onclick="event.stopPropagation()">
+            <div class="pr-modal-header">
+                <span id="pr-modal-title" class="pr-modal-title"></span>
+                <button class="pr-close-btn" onclick="closePreresearch()">&times;</button>
+            </div>
+            <div id="pr-modal-body" class="pr-modal-body"></div>
+        </div>
+    </div>
+</div>
+<script>
+(function() {
+    /* === Tab switching === */
+    var btns = document.querySelectorAll('.tab-btn');
+    var rows = document.querySelectorAll('.data-table tbody tr[data-level]');
+
+    btns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            btns.forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            var tab = btn.getAttribute('data-tab');
+
+            rows.forEach(function(row) {
+                var level = row.getAttribute('data-level');
+                var status = row.getAttribute('data-status');
+                if (tab === 'all') {
+                    row.classList.remove('hidden');
+                } else if (tab === 's') {
+                    row.classList.toggle('hidden', level !== 's');
+                } else if (tab === 'pending') {
+                    row.classList.toggle('hidden', status !== 'pending');
+                } else if (tab === 'completed') {
+                    row.classList.toggle('hidden', status !== 'completed');
+                }
+            });
+        });
+    });
+
+    /* === Navigation scroll highlight === */
+    var navItems = document.querySelectorAll('.nav-item');
+    var sections = [
+        document.getElementById('sec-calendar'),
+        document.getElementById('sec-upcoming'),
+        document.getElementById('sec-events')
+    ];
+
+    function updateNav() {
+        var scrollTop = window.scrollY;
+        var activeIdx = 0;
+        for (var i = sections.length - 1; i >= 0; i--) {
+            if (sections[i] && sections[i].offsetTop - 60 <= scrollTop) {
+                activeIdx = i;
+                break;
+            }
+        }
+        navItems.forEach(function(item, idx) {
+            item.classList.toggle('active', idx === activeIdx);
+        });
+    }
+
+    window.addEventListener('scroll', updateNav, { passive: true });
+    updateNav();
+
+    /* === Inline Markdown -> HTML converter === */
+    function md2html(text) {
+        var html = text;
+        html = html.replace(/^---$/gm, '<hr>');
+        html = html.replace(/^(\|.+\|)\n(\|[-:\s|]+\|)\n((?:\|.+\|\n?)*)/gm, function(m, header, sep, body) {
+            var ths = header.split('|').filter(function(c){return c.trim();}).map(function(c){return '<th>'+c.trim()+'</th>';}).join('');
+            var trs = body.trim().split('\n').map(function(row) {
+                var tds = row.split('|').filter(function(c){return c.trim();}).map(function(c){return '<td>'+c.trim()+'</td>';}).join('');
+                return '<tr>'+tds+'</tr>';
+            }).join('');
+            return '<table><thead><tr>'+ths+'</tr></thead><tbody>'+trs+'</tbody></table>';
+        });
+        html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+        html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+        html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+        html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+        html = html.replace(/<\/blockquote>\n<blockquote>/g, '<br>');
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+        html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+        html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+        html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+        var lines = html.split('\n');
+        var result = [];
+        for (var i = 0; i < lines.length; i++) {
+            var l = lines[i].trim();
+            if (!l) { result.push(''); continue; }
+            if (l.charAt(0) === '<') { result.push(l); continue; }
+            result.push('<p>' + l + '</p>');
+        }
+        return result.join('\n');
+    }
+
+    /* === Smart structured rendering for pre-research reports === */
+    function renderPreresearch(mdText) {
+        var html = md2html(mdText);
+
+        html = html.replace(
+            /<blockquote>([\s\S]*?)<\/blockquote>/,
+            '<div class="pr-conclusion">$1</div>'
+        );
+
+        html = html.replace(
+            /(<h2>市场热度快照<\/h2>)([\s\S]*?)(?=<h2>|<hr>|$)/,
+            function(m, head, body) {
+                var heatLevel = 'medium';
+                var heatLabel = '中';
+                if (/热度定性.*极高|高/.test(body)) { heatLevel = 'high'; heatLabel = '高'; }
+                else if (/热度定性.*低/.test(body)) { heatLevel = 'low'; heatLabel = '低'; }
+                var pct = heatLevel === 'high' ? '90' : heatLevel === 'medium' ? '55' : '25';
+                return head + '<div class="pr-heat"><span>热度：' + heatLabel + '</span>' +
+                    '<div class="pr-heat-bar"><div class="pr-heat-fill ' + heatLevel + '" style="width:' + pct + '%"></div></div></div>' + body;
+            }
+        );
+
+        html = html.replace(/<p>正方[：:](.*?)<\/p>/g, '<div class="pr-pro">✚ $1</div>');
+        html = html.replace(/<p>反方[：:](.*?)<\/p>/g, '<div class="pr-con">✖ $1</div>');
+
+        html = html.replace(/<li>((?!.*传闻|.*待确认)[^<]*(?:配置|续航|动力|搭载|首发|定位|基于|提供|尺寸|预售|首发|算力|设计)[^<]*)<\/li>/g,
+            '<li class="pr-fact">$1</li>');
+        html = html.replace(/<li>(.*(?:传闻|待确认|尚未|预测|可能|预计).*)<\/li>/g,
+            '<li class="pr-rumor">$1</li>');
+
+        html = html.replace(
+            /<h3>方向\d+[：:]\s*(.*?)<\/h3>\s*<ul>([\s\S]*?)<\/ul>/g,
+            function(m, title, body) {
+                var stars = (title.match(/[★]+/) || [''])[0];
+                var cleanTitle = title.replace(/[★]+/, '').replace(/[（(]推荐指数[：:].*?[）)]/, '').trim();
+                var starCount = stars.length;
+                var starsHtml = '';
+                for (var s = 0; s < 5; s++) starsHtml += s < starCount ? '★' : '☆';
+
+                var items = body.replace(/<\/?li>/g, '').split('\n');
+                var angle = '', risk = '', audience = '', reason = '';
+                items.forEach(function(item) {
+                    var val = item.trim();
+                    if (!val) return;
+                    if (val.indexOf('切入角度') >= 0) angle = val.replace(/.*[：:]/, '').trim();
+                    else if (val.indexOf('风险提示') >= 0) risk = val.replace(/.*[：:]/, '').trim();
+                    else if (val.indexOf('目标受众') >= 0) audience = val.replace(/.*[：:]/, '').trim();
+                    else if (val.indexOf('传播理由') >= 0) reason = val.replace(/.*[：:]/, '').trim();
+                });
+
+                return '<div class="pr-direction">' +
+                    '<div class="pr-dir-top">' +
+                    '<span class="pr-dir-stars">' + starsHtml + '</span>' +
+                    '<span class="pr-dir-title">' + cleanTitle + '</span>' +
+                    '<button class="pr-copy-btn" onclick="copyDirection(this)" title="复制方向">复制</button>' +
+                    '</div>' +
+                    (angle ? '<div class="pr-dir-angle">' + angle + '</div>' : '') +
+                    (audience ? '<div class="pr-dir-angle">受众：' + audience + '</div>' : '') +
+                    (reason ? '<div class="pr-dir-angle">理由：' + reason + '</div>' : '') +
+                    (risk ? '<div><span class="pr-dir-risk">风险</span>' + risk + '</div>' : '') +
+                    '</div>';
+            }
+        );
+
+        html = html.replace(
+            /<h2>建议行动<\/h2>([\s\S]*?)(?=<hr>|$)/,
+            function(m, body) {
+                var phases = body.match(/<li>[\s\S]*?<\/li>/g) || [];
+                var phaseLabels = ['事件前', '事件当天', '事件后'];
+                var phaseHtml = phases.map(function(p, idx) {
+                    var content = p.replace(/<\/?li>/g, '').replace(/^\d+\.\s*/, '').trim();
+                    var label = phaseLabels[idx] || ('阶段' + (idx+1));
+                    return '<div class="pr-action-phase"><h4>' + label + '</h4><ul><li>' + content + '</li></ul></div>';
+                }).join('');
+                return '<div class="pr-actions">' + phaseHtml + '</div>';
+            }
+        );
+
+        var sectionMap = {
+            '已知信息基线': {open: false},
+            '争议焦点预判': {open: true},
+            '营销方向建议': {open: true},
+            '预研缺口': {open: false}
+        };
+        Object.keys(sectionMap).forEach(function(title) {
+            var re = new RegExp('(<h2>' + title + '<\\/h2>)([\\s\\S]*?)(?=<h2>|<hr>|<div class="pr-actions">|$)');
+            html = html.replace(re, function(m, head, body) {
+                var isOpen = sectionMap[title].open;
+                var oc = "this.parentElement.classList.toggle('open')";
+                return '<div class="pr-section' + (isOpen ? ' open' : '') + '">' +
+                    '<div class="pr-section-header" onclick="' + oc + '">' +
+                    '<span class="pr-section-title">' + title + '</span>' +
+                    '<span class="pr-section-arrow">▶</span></div>' +
+                    '<div class="pr-section-body">' + head + body + '</div></div>';
+            });
+        });
+
+        html = html.replace(/[（(]\s*(A|B|C|D)级\s*[）)]/g, function(m, lvl) {
+            var cls = 'pr-source-' + lvl.toLowerCase();
+            return '<span class="pr-source-badge ' + cls + '">' + lvl + '级</span>';
+        });
+
+        return html;
+    }
+
+    /* === Modal open / close === */
+    window.openPreresearch = function(templateId) {
+        var tpl = document.getElementById(templateId);
+        if (!tpl) { alert('预研报告未找到'); return; }
+        var mdText = tpl.innerHTML;
+        var ta = document.createElement('textarea');
+        ta.innerHTML = mdText;
+        mdText = ta.value;
+
+        var rendered = renderPreresearch(mdText);
+        document.getElementById('pr-modal-body').innerHTML = rendered;
+
+        var titleMatch = rendered.match(/<h1>(.*?)<\/h1>/);
+        document.getElementById('pr-modal-title').textContent = titleMatch ? titleMatch[1] : '预研报告';
+
+        document.getElementById('pr-modal-overlay').classList.add('open');
+        document.body.style.overflow = 'hidden';
+    };
+
+    window.closePreresearch = function(e) {
+        if (e && e.target !== e.currentTarget) return;
+        document.getElementById('pr-modal-overlay').classList.remove('open');
+        document.body.style.overflow = '';
+    };
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closePreresearch();
+    });
+
+    /* === Copy direction button === */
+    window.copyDirection = function(btn) {
+        var card = btn.closest('.pr-direction');
+        if (!card) return;
+        var title = card.querySelector('.pr-dir-title');
+        var angle = card.querySelector('.pr-dir-angle');
+        var text = (title ? title.textContent : '') + '\n' +
+                   (angle ? angle.textContent : '');
+        navigator.clipboard.writeText(text).then(function() {
+            btn.textContent = '已复制';
+            setTimeout(function() { btn.textContent = '复制'; }, 1500);
+        });
+    };
+})();
+
+</script>
+</body>
+</html>

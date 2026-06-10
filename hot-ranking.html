@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>热点排行 - 汽车情报雷达</title>
+<style>
+:root {--bg:#0f172a;--card:#1e293b;--text:#e2e8f0;--muted:#94a3b8;--accent:#38bdf8;--s-color:#ef4444;--a-color:#f59e0b;--b-color:#10b981;--border:#334155;}
+*{box-sizing:border-box;margin:0;}
+html{scroll-behavior:smooth;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;background:var(--bg);color:var(--text);line-height:1.5;overflow-x:hidden;}
+.container{width:100%;margin:0 auto;padding:16px;max-width:1200px;}
+@media(min-width:768px){.container{padding:16px 24px;}}
+h2{margin:20px 0 12px;font-size:1.1rem;border-left:3px solid var(--accent);padding-left:10px;}
+.level-badge{display:inline-block;padding:1px 7px;border-radius:3px;font-size:0.7rem;font-weight:600;margin-right:5px;white-space:nowrap;}
+.level-s{background:rgba(239,68,68,0.2);color:#fca5a5;}
+.level-a{background:rgba(245,158,11,0.2);color:#fcd34d;}
+.level-b{background:rgba(16,185,129,0.2);color:#6ee7b7;}
+.footer{margin-top:24px;color:var(--muted);font-size:0.75rem;text-align:center;}
+
+/* === Site Nav === */
+.site-nav {
+    display: flex; align-items: center; gap: 16px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 20px; margin-bottom: 20px;
+}
+.nav-logo {
+    font-size: 1.1rem; font-weight: 800; color: var(--accent);
+    text-decoration: none; white-space: nowrap;
+}
+.nav-links { display: flex; gap: 4px; flex: 1; }
+.nav-link {
+    padding: 4px 14px; border-radius: 6px; font-size: 0.82rem;
+    color: var(--muted); text-decoration: none; transition: all 0.15s;
+}
+.nav-link:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+.nav-link.active { color: var(--accent); background: rgba(56,189,248,0.1); }
+.nav-subscribe-btn {
+    padding: 5px 14px; border-radius: 6px; font-size: 0.78rem;
+    background: rgba(56,189,248,0.15); color: var(--accent);
+    text-decoration: none; border: 1px solid rgba(56,189,248,0.3);
+    white-space: nowrap; transition: all 0.15s;
+}
+.nav-subscribe-btn:hover { background: rgba(56,189,248,0.25); }
+@media (max-width: 600px) {
+    .site-nav { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+    .nav-links { order: 3; width: 100%; }
+}
+
+    .ranking-list { display: flex; flex-direction: column; gap: 8px; }
+    .rank-card {
+        display: flex; align-items: center; gap: 12px;
+        background: var(--card); border: 1px solid var(--border);
+        border-radius: 10px; padding: 12px 16px; transition: border-color 0.15s;
+    }
+    .rank-card:hover { border-color: var(--accent); }
+    .rank-card.rank-s { border-left: 3px solid var(--s-color); }
+    .rank-num { font-size: 1.2rem; font-weight: 800; color: var(--muted); min-width: 28px; text-align: center; }
+    .rank-s .rank-num { color: var(--s-color); }
+    .rank-logo-wrap { width: 36px; height: 36px; flex-shrink: 0; }
+    .rank-logo { width: 36px; height: 36px; object-fit: contain; border-radius: 6px; }
+    .rank-body { flex: 1; min-width: 0; }
+    .rank-title { font-size: 0.9rem; font-weight: 600; margin-bottom: 2px; word-break: break-word; }
+    .rank-meta { font-size: 0.75rem; color: var(--muted); display: flex; gap: 12px; margin-bottom: 2px; }
+    .rank-countdown { color: var(--accent); font-weight: 600; }
+    .rank-note { font-size: 0.72rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    
+</style>
+</head>
+<body>
+<div class="container">
+<div class="site-nav">
+    <a class="nav-logo" href="index.html">汽车情报雷达</a>
+    <div class="nav-links">
+        <a class="nav-link" href="index.html">日历</a>
+        <a class="nav-link active" href="hot-ranking.html">热点</a>
+        <a class="nav-link" href="price-tracker.html">价格</a>
+    </div>
+    <a class="nav-subscribe-btn" href="subscribe.html">订阅日报</a>
+</div>
+<h2>热点车型排行 TOP 20</h2>
+<p style="color:var(--muted);font-size:0.82rem;margin-bottom:16px;">基于上市节点、事件等级、时间紧迫度综合排序 · 更新于 2026-06-10</p>
+<div class="ranking-list">
+
+        <div class="rank-card">
+            <div class="rank-num">1</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-a">A级</span>
+                    吉利银河星舰7 EV
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">6月10日 · 上市</span>
+                    <span class="rank-countdown">0天后</span>
+                </div>
+                <div class="rank-note">800V快充/CLTC 605km续航/Flyme Auto座舱/预计10-15万</div>
+            </div>
+        </div>
+        <div class="rank-card">
+            <div class="rank-num">2</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-a">A级</span>
+                    smart精灵#6 EHD
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">6月11日 · 上市</span>
+                    <span class="rank-countdown">1天后</span>
+                </div>
+                <div class="rank-note">smart首款插混轿车/18.99万起/4个版本/奔驰设计+吉利智造/综合续航1675km</div>
+            </div>
+        </div>
+        <div class="rank-card">
+            <div class="rank-num">3</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-a">A级</span>
+                    新款乐道L60
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">6月11日 · 上市</span>
+                    <span class="rank-countdown">1天后</span>
+                </div>
+                <div class="rank-note">106项产品升级/900V碳化硅/全域换电/5nm智驾芯片/粤港澳车展已预售</div>
+            </div>
+        </div>
+        <div class="rank-card">
+            <div class="rank-num">4</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-a">A级</span>
+                    昊铂S600
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">6月12日 · 上市</span>
+                    <span class="rank-countdown">2天后</span>
+                </div>
+                <div class="rank-note">纯电+增程双动力/权益价18.89万起/22扬声器/全系高阶智驾</div>
+            </div>
+        </div>
+        <div class="rank-card">
+            <div class="rank-num">5</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-b">B级</span>
+                    北京越野BJ30 高光版
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">6月12日 · 上市</span>
+                    <span class="rank-countdown">2天后</span>
+                </div>
+                <div class="rank-note">方盒子造型升级/三擎四驱HEV混动/第15万台下线里程碑</div>
+            </div>
+        </div>
+        <div class="rank-card">
+            <div class="rank-num">6</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-a">A级</span>
+                    第二十八届重庆国际车展
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">6月13日-21日 · 展会</span>
+                    <span class="rank-countdown">3天后</span>
+                </div>
+                <div class="rank-note">16万㎡/80+品牌/小米/仰望首次参展</div>
+            </div>
+        </div>
+        <div class="rank-card">
+            <div class="rank-num">7</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-b">B级</span>
+                    2026中国汽车重庆论坛
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">6月13日-21日 · 论坛</span>
+                    <span class="rank-countdown">3天后</span>
+                </div>
+                <div class="rank-note">同期行业论坛</div>
+            </div>
+        </div>
+        <div class="rank-card">
+            <div class="rank-num">8</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-a">A级</span>
+                    2026款吉利银河E5
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">7月24日 · 上市</span>
+                    <span class="rank-countdown">44天后</span>
+                </div>
+                <div class="rank-note">续航和智能升级</div>
+            </div>
+        </div>
+        <div class="rank-card rank-s">
+            <div class="rank-num">9</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-s">S级</span>
+                    尊界S800 Grand Design典藏大观（160-200万）
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">6月下旬 · 上市</span>
+                    <span class="rank-countdown">待定</span>
+                </div>
+                <div class="rank-note">粤港澳车展全球首秀+预售160-200万；预计6月下旬上市；现款S800累计交付18500台</div>
+            </div>
+        </div>
+        <div class="rank-card rank-s">
+            <div class="rank-num">10</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-s">S级</span>
+                    比亚迪大唐
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">6月中旬（约18日） · 上市</span>
+                    <span class="rank-countdown">待定</span>
+                </div>
+                <div class="rank-note">王朝网旗舰D级SUV/预售超10万台/25-32万/西安上市/950km续航/1000V平台</div>
+            </div>
+        </div>
+        <div class="rank-card rank-s">
+            <div class="rank-num">11</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-s">S级</span>
+                    全新理想L8
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">6月底 · 发布</span>
+                    <span class="rank-countdown">待定</span>
+                </div>
+                <div class="rank-note">理想主力换代车型</div>
+            </div>
+        </div>
+        <div class="rank-card rank-s">
+            <div class="rank-num">12</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-s">S级</span>
+                    理想i8（家庭六座纯电SUV）
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">7月 · 发布</span>
+                    <span class="rank-countdown">待定</span>
+                </div>
+                <div class="rank-note">理想CEO李想官宣7月发布，9月交付</div>
+            </div>
+        </div>
+        <div class="rank-card rank-s">
+            <div class="rank-num">13</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-s">S级</span>
+                    小米昆仑N3（YU9增程SUV）
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">7月 · 上市</span>
+                    <span class="rank-countdown">待定</span>
+                </div>
+                <div class="rank-note">小米首款增程/5.3m全尺寸旗舰/800V平台/独立子品牌&quot;寻天&quot;/对标理想L9</div>
+            </div>
+        </div>
+        <div class="rank-card rank-s">
+            <div class="rank-num">14</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-s">S级</span>
+                    理想i6（大众化纯电大五座SUV）
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">9月 · 发布</span>
+                    <span class="rank-countdown">待定</span>
+                </div>
+                <div class="rank-note">李想官宣9月发布，瞄准20万级市场</div>
+            </div>
+        </div>
+        <div class="rank-card rank-s">
+            <div class="rank-num">15</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-s">S级</span>
+                    小米首款增程全尺寸SUV（或命名YU9）
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">四季度 · 上市</span>
+                    <span class="rank-countdown">待定</span>
+                </div>
+                <div class="rank-note">小米2026年最重磅车型之一</div>
+            </div>
+        </div>
+        <div class="rank-card">
+            <div class="rank-num">16</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-a">A级</span>
+                    启境GT7（广汽×华为合作猎装轿跑）
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">6月中下旬 · 上市交付</span>
+                    <span class="rank-countdown">待定</span>
+                </div>
+                <div class="rank-note">预售21.99-30.99万/250kW最大功率</div>
+            </div>
+        </div>
+        <div class="rank-card">
+            <div class="rank-num">17</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-a">A级</span>
+                    腾势N8L闪充版
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">6月上旬 · 上市</span>
+                    <span class="rank-countdown">待定</span>
+                </div>
+                <div class="rank-note">搭载第二代刀片电池/天神之眼5.0/预售价35-40万</div>
+            </div>
+        </div>
+        <div class="rank-card">
+            <div class="rank-num">18</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-a">A级</span>
+                    比亚迪海狮08
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">6月 · 上市</span>
+                    <span class="rank-countdown">待定</span>
+                </div>
+                <div class="rank-note">大型SUV/已开启预售/6月正式上市</div>
+            </div>
+        </div>
+        <div class="rank-card">
+            <div class="rank-num">19</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-a">A级</span>
+                    奕境旗舰大六座SUV（东风×华为）
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">6月 · 上市</span>
+                    <span class="rank-countdown">待定</span>
+                </div>
+                <div class="rank-note">北京车展亮相，上半年推向市场</div>
+            </div>
+        </div>
+        <div class="rank-card">
+            <div class="rank-num">20</div>
+            <div class="rank-logo-wrap"></div>
+            <div class="rank-body">
+                <div class="rank-title">
+                    <span class="level-badge level-b">B级</span>
+                    一汽悦意08（新生代智享轿跑）
+                </div>
+                <div class="rank-meta">
+                    <span class="rank-date">6月 · 上市</span>
+                    <span class="rank-countdown">待定</span>
+                </div>
+                <div class="rank-note">预售10.49-14.39万/粤港澳车展亮相</div>
+            </div>
+        </div>
+</div>
+<div class="footer">由汽车情报雷达自动生成 · 数据来源：公开信息整理</div>
+</div>
+</body>
+</html>
